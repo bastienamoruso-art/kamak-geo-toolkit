@@ -48,10 +48,42 @@
   .mention-yes { color: #0a8; font-family: var(--mono); font-weight: 700; }
   .mention-no { color: var(--fg-3); font-family: var(--mono); }
   .pos-pill { display: inline-block; padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 11px; background: var(--primary); }
-  .response-snippet { font-family: var(--mono); font-size: 11px; color: var(--fg-3); max-width: 480px; word-break: break-word; }
+  .response-snippet { font-family: var(--mono); font-size: 11px; color: var(--fg-3); max-width: 480px; word-break: break-word; line-height: 1.5; max-height: 70px; overflow: hidden; position: relative; }
+  .response-snippet.expanded { max-height: none; }
+  .response-snippet:not(.expanded)::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: linear-gradient(transparent, var(--white)); }
+  .toggle-btn { background: none; border: none; color: var(--accent); font-family: var(--mono); font-size: 11px; cursor: pointer; padding: 4px 0; margin-top: 4px; }
+  .toggle-btn:hover { text-decoration: underline; }
   .provider-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 700; background: var(--bg); }
   .error-row { background: rgba(255, 0, 0, 0.04); }
   .error-text { color: #c00; font-family: var(--mono); font-size: 11px; }
+
+  /* Section interpretation pliable */
+  details.interpretation { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 32px; }
+  details.interpretation summary { cursor: pointer; font-family: var(--mono); font-weight: 700; font-size: 14px; padding: 8px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.interpretation summary::before { content: "▸"; color: var(--accent); transition: transform 0.15s; }
+  details.interpretation[open] summary::before { transform: rotate(90deg); }
+  details.interpretation summary::-webkit-details-marker { display: none; }
+  .interp-content { padding-top: 16px; font-size: 14px; line-height: 1.7; color: var(--fg-2); }
+  .interp-content h3 { font-family: var(--mono); font-size: 14px; color: var(--fg-1); margin-top: 20px; margin-bottom: 8px; }
+  .interp-content h3:first-child { margin-top: 0; }
+  .interp-content p { margin-bottom: 12px; }
+  .interp-content ul { padding-left: 20px; margin-bottom: 12px; }
+  .interp-content li { margin-bottom: 6px; }
+  .interp-content code { font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 1px 6px; border-radius: 3px; }
+  .interp-content strong { color: var(--fg-1); }
+
+  /* Filtre provider */
+  .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-bar__label { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+  .filter-pill { background: var(--white); border: 1px solid var(--border); padding: 6px 14px; border-radius: 16px; font-family: var(--mono); font-size: 12px; cursor: pointer; transition: all 0.15s; user-select: none; }
+  .filter-pill:hover { background: var(--bg); }
+  .filter-pill.active { background: var(--fg-1); color: var(--white); border-color: var(--fg-1); }
+  .filter-pill__count { color: var(--fg-3); margin-left: 6px; }
+  .filter-pill.active .filter-pill__count { color: rgba(255,255,255,0.6); }
+
+  /* Row hidden via filtre */
+  tr.row-hidden { display: none; }
+
   footer { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 48px; color: var(--fg-3); font-size: 13px; }
   footer a { color: var(--fg-1); text-decoration: underline; }
 </style>
@@ -64,16 +96,56 @@
     <p class="meta">
       Persona <span>{{ persona.id }}</span> ·
       Généré le <span>{{ generated_at }}</span> ·
-      <span>{{ results|length }}</span> appels API
+      <span>{{ results|length }}</span> appels API ·
+      Web search <span>{% if web_search %}ON{% else %}OFF{% endif %}</span>
       {% if competitors %}· concurrents : <span>{{ competitors|join(", ") }}</span>{% endif %}
     </p>
     {% if variables %}
     <p class="meta">Variables : {% for k, v in variables.items() %}<span>{{ k }}</span>={{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
     {% endif %}
-    <div class="warning">
-      L'API n'est pas l'interface réelle — pas d'historique utilisateur, pas de géolocalisation, pas de routing dynamique entre versions du modèle. Utilisez ces données pour la <strong>tendance</strong>, croisez avec le test manuel pour la <strong>vérité prospect</strong>.
-    </div>
   </header>
+
+  <details class="interpretation">
+    <summary>Comment lire ce rapport</summary>
+    <div class="interp-content">
+      <h3>Les 4 sections du rapport</h3>
+      <ul>
+        <li><strong>Vue d'ensemble</strong> — taux de mention de votre marque par provider, en pourcentage. C'est votre score de présence dans le modèle (ou dans le web search si <code>--web-search</code> est activé).</li>
+        <li><strong>Concurrents cités</strong> — qui le modèle nomme spontanément quand on lui pose la question persona. Ce sont les marques que le modèle considère comme références sur ce marché.</li>
+        <li><strong>Sources web citées</strong> — URLs et domaines réellement utilisés par le modèle (uniquement si <code>--web-search</code> est ON, sinon vide ou hallucinable). Ce sont les sites où placer votre marque pour entrer dans le corpus retrieval.</li>
+        <li><strong>Détail prompt par prompt</strong> — chaque appel API avec sa réponse, filtrable par provider.</li>
+      </ul>
+
+      <h3>Comment interpréter votre taux de mention</h3>
+      <ul>
+        <li><strong>0 %</strong> — votre marque n'est pas dans le corpus du modèle (mode sans search) ou aucune source web ne vous référence sur ces requêtes (mode search). Action : pression de marque (PR, citations tierces) ou SEO local sur les requêtes manquées.</li>
+        <li><strong>10-30 %</strong> — vous êtes connu mais pas dominant. Vous êtes cité sur les prompts les plus génériques, pas sur les recommandations précises. Action : travailler les comparatifs/listicles sectoriels où vous figurez avec vos concurrents.</li>
+        <li><strong>40-60 %</strong> — vous êtes une référence reconnue sur le marché. Action : tenir cette position et capitaliser sur les prompts FAQ/recommandation où vous n'êtes pas encore cité.</li>
+        <li><strong>60 %+</strong> — vous êtes top of mind pour ce modèle. C'est rare et précieux. Action : monitorer mois après mois pour ne pas perdre la position.</li>
+      </ul>
+
+      <h3>Web search ON vs OFF — interprétation différente</h3>
+      <p><strong>Mode web search OFF</strong> (par défaut sans <code>--web-search</code>) : vous mesurez la présence de votre marque dans le <strong>corpus d'entraînement</strong> du modèle. Si vous n'y êtes pas, vous êtes invisible sur l'interface standard de ces assistants quand l'utilisateur n'active pas le mode web.</p>
+      <p><strong>Mode web search ON</strong> (<code>--web-search</code>) : vous mesurez ce qu'un utilisateur reçoit quand il active le mode "rechercher sur le web" côté UI. C'est plus proche de l'usage réel en 2026, et plus dépendant de votre SEO classique.</p>
+      <p>Un site bien référencé en Google peut être <strong>visible en mode search</strong> mais <strong>invisible en mode sans search</strong>. C'est précisément ce que ce rapport vous permet de mesurer.</p>
+
+      <h3>Différences entre providers — c'est attendu</h3>
+      <ul>
+        <li><strong>OpenAI</strong> (gpt-4o-mini) — très conservateur sans web search, refuse souvent de citer des marques. Avec search, ramène les sources de son moteur (Bing principalement).</li>
+        <li><strong>Anthropic</strong> (Claude Sonnet 4.5) — plus enclin à citer des marques même sans search. Citations structurées avec annotations.</li>
+        <li><strong>Perplexity</strong> (sonar) — toujours en mode search natif. Ce qu'il retourne est ce qu'un utilisateur voit dans l'app Perplexity. Le plus proche de la vérité prospect.</li>
+        <li><strong>Gemini</strong> (2.5 flash) — sans search, basé sur le corpus Google. Avec search (google_search), ramène les résultats Google indexés.</li>
+      </ul>
+      <p>Un écart de mention entre 2 providers n'est pas un bug — c'est un signal sur quels corpus/index vous référencent.</p>
+
+      <h3>Limites à connaître</h3>
+      <ul>
+        <li><strong>Variance</strong> — les réponses LLM ne sont pas déterministes. Refaire tourner le même prompt peut donner un résultat légèrement différent. Comptez sur la <strong>tendance</strong> sur plusieurs runs, pas sur une mesure unique.</li>
+        <li><strong>L'API n'est pas l'interface réelle</strong> — pas d'historique utilisateur, pas de géolocalisation, pas de routing dynamique entre versions du modèle. Croisez avec le test manuel dans <code>prompts/</code> pour la vérité prospect complète.</li>
+        <li><strong>Web search hallucinable</strong> — sans <code>--web-search</code>, si une URL apparaît dans le texte de réponse, elle peut être inventée. Avec <code>--web-search</code>, les URLs sont des vraies pages crawlées par le provider.</li>
+      </ul>
+    </div>
+  </details>
 
   <section>
     <h2>Vue d'ensemble par provider</h2>
@@ -117,7 +189,16 @@
   {% for provider, stats in by_provider.items() %}{% if stats.source_counts %}{% set any_sources.found = true %}{% endif %}{% endfor %}
   {% if any_sources.found %}
   <section>
-    <h2>Sources citées par provider <span style="color: var(--fg-3); font-size: 14px; font-family: var(--sans);">— les sites/médias où placer votre marque pour entrer dans le corpus</span></h2>
+    <h2>Sources web citées par provider
+      <span style="color: var(--fg-3); font-size: 14px; font-family: var(--sans);">
+        {% if web_search %}— web search natif activé · domaines vérifiables{% else %}— URLs extraites du texte de réponse (sans web search){% endif %}
+      </span>
+    </h2>
+    {% if not web_search %}
+    <p style="background: var(--primary); padding: 12px 16px; border-radius: 8px; font-family: var(--mono); font-size: 13px; margin-bottom: 16px;">
+      Pour des sources réelles et vérifiables, relancez avec <code>--web-search</code>. Cela active le mode search natif (OpenAI search-preview, Anthropic tool web_search, Gemini google_search, Perplexity natif) et ramène les URLs exactes utilisées par chaque modèle.
+    </p>
+    {% endif %}
     {% for provider, stats in by_provider.items() %}
       {% if stats.source_counts %}
       <div class="competitors-card">
@@ -135,7 +216,14 @@
 
   <section>
     <h2>Détail prompt par prompt</h2>
-    <table>
+    <div class="filter-bar">
+      <span class="filter-bar__label">Filtre provider</span>
+      <span class="filter-pill active" data-filter="all">tous <span class="filter-pill__count">{{ results|length }}</span></span>
+      {% for provider, stats in by_provider.items() %}
+      <span class="filter-pill" data-filter="{{ provider }}">{{ provider }} <span class="filter-pill__count">{{ stats.total }}</span></span>
+      {% endfor %}
+    </div>
+    <table id="detail-table">
       <thead>
         <tr>
           <th>#</th>
@@ -150,7 +238,7 @@
       </thead>
       <tbody>
         {% for r in results %}
-        <tr {% if r.error %}class="error-row"{% endif %}>
+        <tr {% if r.error %}class="error-row"{% endif %} data-provider="{{ r.provider }}">
           <td>{{ r.prompt_id }}</td>
           <td>{{ r.prompt_category }}</td>
           <td><span class="provider-pill">{{ r.provider }}</span></td>
@@ -161,7 +249,12 @@
           <td>{{ r.competitors_found }}</td>
           <td>{{ r.citations_count }}</td>
           <td>
-            {% if r.error %}<span class="error-text">{{ r.error }}</span>{% else %}<span class="response-snippet">{{ r.response_text }}</span>{% endif %}
+            {% if r.error %}
+              <span class="error-text">{{ r.error }}</span>
+            {% else %}
+              <div class="response-snippet">{{ r.response_text }}</div>
+              {% if r.response_text|length > 150 %}<button class="toggle-btn" onclick="this.previousElementSibling.classList.toggle('expanded'); this.textContent = this.previousElementSibling.classList.contains('expanded') ? 'Replier' : 'Voir plus';">Voir plus</button>{% endif %}
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -174,5 +267,24 @@
     · Bastien Amoruso / <a href="https://kamak.ai">KAMAK</a> · MIT
   </footer>
 </div>
+
+<script>
+  // Filtre provider — clic sur les pills
+  document.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const filter = pill.dataset.filter;
+      document.querySelectorAll('#detail-table tbody tr').forEach(row => {
+        if (filter === 'all' || row.dataset.provider === filter) {
+          row.classList.remove('row-hidden');
+        } else {
+          row.classList.add('row-hidden');
+        }
+      });
+    });
+  });
+</script>
+
 </body>
 </html>

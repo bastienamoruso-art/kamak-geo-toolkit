@@ -3,30 +3,30 @@
 probe-api.py — Tape les APIs LLM en local pour mesurer la visibilité IA.
 
 Lit un persona depuis prompts.json, soumet chaque prompt à OpenAI,
-Anthropic, Perplexity et Mistral (selon les clés API disponibles),
-détecte la mention de votre marque, les concurrents cités et les
-sources retournées, puis produit un CSV + un rapport HTML.
+Anthropic, Perplexity, Gemini (et Mistral en opt-in), selon les
+clés API disponibles. Détecte la mention de votre marque, les
+concurrents cités, et — avec --web-search — les sources réelles
+que les modèles utilisent (vérifiables, pas hallucinées).
 
 L'angle : ce que les outils GEO du marché vendent 50-200 €/mois,
-fait en local pour 2-5 € de tokens par run complet (8 personas
-× 15 prompts × 4 modèles = 480 appels).
+fait en local pour 2-5 € de tokens par run complet.
 
 À utiliser EN COMPLÉMENT du test manuel dans l'interface réelle
-(template prompts/) et du parsing logs (parse-logs.py). L'API
-n'est PAS l'interface réelle : pas d'historique, pas d'abonnement,
-pas de géolocalisation, pas de routing dynamique entre versions.
+(template prompts/) et du parsing logs (parse-logs.py).
 
 Usage :
     export OPENAI_API_KEY=sk-...
     export ANTHROPIC_API_KEY=sk-ant-...
     export PERPLEXITY_API_KEY=pplx-...
-    export MISTRAL_API_KEY=...
+    export GEMINI_API_KEY=...
+    export MISTRAL_API_KEY=...   # opt-in
 
     python probe-api.py \\
         --persona 01-cgp-courtier \\
         --brand "Aeconomia" \\
         --competitors "Cafpi,Empruntis,Meilleurtaux" \\
-        --variables '{"VILLE":"Orléans","ZONE":"Loiret","TICKET":"250 000 €","SPECIALITE":"primo-accédants"}' \\
+        --variables '{"VILLE":"Orléans","ZONE":"Loiret"}' \\
+        --web-search \\
         --out ./probe-report
 """
 
@@ -45,33 +45,38 @@ from pathlib import Path
 MODELS = {
     "openai": {
         "name": "gpt-4o-mini",
+        "name_search": "gpt-4o-mini-search-preview",
         "endpoint": "https://api.openai.com/v1/chat/completions",
         "env": "OPENAI_API_KEY",
     },
     "anthropic": {
         "name": "claude-sonnet-4-5",
+        "name_search": "claude-sonnet-4-5",
         "endpoint": "https://api.anthropic.com/v1/messages",
         "env": "ANTHROPIC_API_KEY",
     },
     "perplexity": {
         "name": "sonar",
+        "name_search": "sonar",
         "endpoint": "https://api.perplexity.ai/chat/completions",
         "env": "PERPLEXITY_API_KEY",
     },
     "gemini": {
         "name": "gemini-2.5-flash",
+        "name_search": "gemini-2.5-flash",
         "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
         "env": "GEMINI_API_KEY",
     },
     "mistral": {
         "name": "mistral-large-latest",
+        "name_search": "mistral-large-latest",
         "endpoint": "https://api.mistral.ai/v1/chat/completions",
         "env": "MISTRAL_API_KEY",
     },
 }
 
 
-def _http_post(url, body, headers, timeout=60):
+def _http_post(url, body, headers, timeout=120):
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
@@ -84,22 +89,29 @@ def _http_post(url, body, headers, timeout=60):
         return {"error": str(e)}
 
 
-def call_openai(prompt, key):
+def call_openai(prompt, key, web_search=False):
+    model = MODELS["openai"]["name_search"] if web_search else MODELS["openai"]["name"]
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+    if web_search:
+        body["web_search_options"] = {}
     return _http_post(
         MODELS["openai"]["endpoint"],
-        {"model": MODELS["openai"]["name"], "messages": [{"role": "user", "content": prompt}]},
+        body,
         {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
 
 
-def call_anthropic(prompt, key):
+def call_anthropic(prompt, key, web_search=False):
+    body = {
+        "model": MODELS["anthropic"]["name"],
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if web_search:
+        body["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
     return _http_post(
         MODELS["anthropic"]["endpoint"],
-        {
-            "model": MODELS["anthropic"]["name"],
-            "max_tokens": 1024,
-            "messages": [{"role": "user", "content": prompt}],
-        },
+        body,
         {
             "x-api-key": key,
             "anthropic-version": "2023-06-01",
@@ -108,7 +120,7 @@ def call_anthropic(prompt, key):
     )
 
 
-def call_perplexity(prompt, key):
+def call_perplexity(prompt, key, web_search=False):
     return _http_post(
         MODELS["perplexity"]["endpoint"],
         {
@@ -120,15 +132,20 @@ def call_perplexity(prompt, key):
     )
 
 
-def call_gemini(prompt, key):
+def call_gemini(prompt, key, web_search=False):
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+    if web_search:
+        body["tools"] = [{"google_search": {}}]
     return _http_post(
         f"{MODELS['gemini']['endpoint']}?key={key}",
-        {"contents": [{"parts": [{"text": prompt}]}]},
+        body,
         {"Content-Type": "application/json"},
     )
 
 
-def call_mistral(prompt, key):
+def call_mistral(prompt, key, web_search=False):
+    if web_search:
+        print("    [warning] Mistral n'a pas de web_search natif simple via API. Appel sans search.", file=sys.stderr)
     return _http_post(
         MODELS["mistral"]["endpoint"],
         {"model": MODELS["mistral"]["name"], "messages": [{"role": "user", "content": prompt}]},
@@ -152,9 +169,15 @@ def extract_text(provider, resp):
         if provider in ("openai", "perplexity", "mistral"):
             return resp["choices"][0]["message"]["content"]
         if provider == "anthropic":
-            return resp["content"][0]["text"]
+            # Concat tous les blocs de type "text"
+            parts = []
+            for block in resp.get("content", []):
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+            return "\n".join(parts) if parts else None
         if provider == "gemini":
-            return resp["candidates"][0]["content"]["parts"][0]["text"]
+            parts = resp["candidates"][0]["content"]["parts"]
+            return "\n".join(p.get("text", "") for p in parts if isinstance(p, dict))
     except (KeyError, IndexError, TypeError):
         return None
     return None
@@ -162,52 +185,90 @@ def extract_text(provider, resp):
 
 URL_RE = re.compile(r"https?://[^\s\)\]\,\"\<\>]+")
 
-# Domaines mentionnés sans http:// : "meilleurtaux.com", "cbanque.fr", "lefigaro.fr", etc.
-DOMAIN_RE = re.compile(r"\b((?:[a-z0-9-]+\.){1,3}(?:fr|com|net|org|info|eu|io|ai))\b", re.IGNORECASE)
-
-# Mentions de medias/sites par leur nom (pattern "selon X", "X.fr", marques connues)
-NAMED_SOURCE_RE = re.compile(
-    r"(?:selon|d'apres|cite par|source\s*:|sites?\s+comme|comparateurs?\s+comme|via)\s+"
-    r"([A-Z][A-Za-z0-9\-\s&'\.]{2,40}?)(?:[\,\.\;\:\)]|$| qui| permet)",
-    re.IGNORECASE,
-)
-
 
 def extract_citations(provider, resp, text):
-    """URLs explicites uniquement (pour rapport actuel)."""
-    if not isinstance(resp, dict) or "error" in resp or not text:
+    """Citations structurées issues du web search natif quand disponible, sinon URLs dans le texte."""
+    if not isinstance(resp, dict) or "error" in resp:
         return []
     urls = set()
-    if provider == "perplexity" and isinstance(resp.get("citations"), list):
-        urls.update(resp["citations"])
-    urls.update(URL_RE.findall(text))
-    return sorted(urls)
+    titles = {}
 
+    try:
+        if provider == "openai":
+            # Chat Completions search-preview : annotations dans message
+            msg = resp.get("choices", [{}])[0].get("message", {})
+            for ann in msg.get("annotations", []) or []:
+                if ann.get("type") == "url_citation":
+                    uc = ann.get("url_citation", {})
+                    url = uc.get("url")
+                    if url:
+                        urls.add(url)
+                        if uc.get("title"):
+                            titles[url] = uc["title"]
 
-def extract_sources(text):
-    """Extraction large : URLs + domaines mentionnes + sources nommees."""
-    if not text:
-        return []
-    sources = set()
-    # URLs explicites
-    for u in URL_RE.findall(text):
-        sources.add(u.rstrip(".,;:)"))
-    # Domaines mentionnes sans http (genre "meilleurtaux.com")
-    for d in DOMAIN_RE.findall(text):
-        sources.add(d.lower())
-    # Sources nommees (selon X, sites comme Y)
-    for m in NAMED_SOURCE_RE.findall(text):
-        clean = m.strip().rstrip(".,;:")
-        if 3 <= len(clean) <= 40:
-            sources.add(clean)
-    return sorted(sources)
+        elif provider == "anthropic":
+            # Citations attachees aux blocs text + tool_result si web_search
+            for block in resp.get("content", []):
+                if not isinstance(block, dict):
+                    continue
+                # Citations attachees au text
+                for cit in block.get("citations", []) or []:
+                    url = cit.get("url")
+                    if url:
+                        urls.add(url)
+                        if cit.get("title"):
+                            titles[url] = cit["title"]
+                # Tool result : contient les resultats de recherche
+                if block.get("type") == "web_search_tool_result":
+                    content = block.get("content", [])
+                    if isinstance(content, list):
+                        for item in content:
+                            if isinstance(item, dict):
+                                url = item.get("url")
+                                if url:
+                                    urls.add(url)
+                                    if item.get("title"):
+                                        titles[url] = item["title"]
 
+        elif provider == "perplexity":
+            for url in resp.get("citations", []) or []:
+                if url:
+                    urls.add(url)
+            # Aussi search_results si present
+            for item in resp.get("search_results", []) or []:
+                if isinstance(item, dict) and item.get("url"):
+                    urls.add(item["url"])
+                    if item.get("title"):
+                        titles[item["url"]] = item["title"]
 
-SOURCES_FOLLOWUP = (
-    "Pour cette reponse, sur quels sites web, comparateurs, medias ou sources "
-    "te bases-tu generalement ? Liste 5 sources concretes en donnant le nom du site "
-    "ou son URL si possible. Reponse au format liste, pas de phrase d'intro."
-)
+        elif provider == "gemini":
+            cand = resp.get("candidates", [{}])[0]
+            gm = cand.get("groundingMetadata", {})
+            for chunk in gm.get("groundingChunks", []) or []:
+                if isinstance(chunk, dict) and chunk.get("web"):
+                    web = chunk["web"]
+                    uri = web.get("uri")
+                    title = web.get("title")
+                    # Gemini retourne souvent des redirects vertexaisearch.cloud.google.com
+                    # avec le vrai domaine dans le title. On stocke comme cle le title
+                    # quand c'est le cas pour faciliter l'agregation.
+                    if uri and "vertexaisearch.cloud.google.com" in uri and title:
+                        # title est genre "cafpi.fr" ou "Cafpi - courtier crédit"
+                        # on garde l'uri mais on stocke title comme clef domaine
+                        urls.add(uri)
+                        titles[uri] = title
+                    elif uri:
+                        urls.add(uri)
+                        if title:
+                            titles[uri] = title
+    except (KeyError, IndexError, TypeError):
+        pass
+
+    # Fallback : URLs trouvées dans le texte (utile sans web_search)
+    if text:
+        urls.update(URL_RE.findall(text))
+
+    return sorted(urls), titles
 
 
 def detect_brand(text, brand):
@@ -233,6 +294,20 @@ def substitute(prompt, variables):
     return prompt
 
 
+def domain_of(url, title=None):
+    """Extrait le domaine d'une URL pour agrégation.
+    Si l'URL est une redirection (Vertex AI Gemini), tente de tirer le domaine du titre."""
+    # Cas Gemini redirect : extraire le domaine du titre si possible
+    if url and "vertexaisearch.cloud.google.com" in url and title:
+        # Le titre Gemini est souvent juste le domaine : "cafpi.fr"
+        m = re.search(r"\b([a-z0-9][a-z0-9\-]{1,62}\.(?:fr|com|net|org|info|eu|io|ai|gouv\.fr))\b", title.lower())
+        if m:
+            return m.group(1)
+        return title.lower()
+    m = re.match(r"https?://(?:www\.)?([^/\s]+)", url, re.IGNORECASE)
+    return m.group(1).lower() if m else url
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Probe les APIs LLM pour mesurer la visibilité IA d'une marque.",
@@ -240,7 +315,7 @@ def main():
         epilog=(
             "Exemple :\n"
             "  python probe-api.py --persona 01-cgp-courtier --brand 'Aeconomia' \\\n"
-            "    --competitors 'Cafpi,Empruntis' \\\n"
+            "    --competitors 'Cafpi,Empruntis' --web-search \\\n"
             "    --variables '{\"VILLE\":\"Orléans\",\"ZONE\":\"Loiret\"}'\n"
         ),
     )
@@ -252,8 +327,8 @@ def main():
     parser.add_argument("--models", default="openai,anthropic,perplexity,gemini", help="Liste providers (defaut: openai,anthropic,perplexity,gemini ; mistral disponible mais opt-in)")
     parser.add_argument("--out", default="./probe-report", help="Dossier de sortie")
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
+    parser.add_argument("--web-search", action="store_true", help="Active le web search NATIF sur chaque provider (OpenAI gpt-4o-mini-search-preview, Anthropic tool web_search, Gemini google_search, Perplexity natif). Sources reelles + verifiables. Cout legerement plus eleve.")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")
-    parser.add_argument("--ask-sources", action="store_true", help="Pour chaque prompt, ajoute un 2e appel demandant les sources que le modele utilise (double le cout, mais ramene les sites/medias a viser)")
 
     args = parser.parse_args()
 
@@ -285,6 +360,7 @@ def main():
         print(f"Dry-run sur persona {persona['id']} ({len(persona['prompts'])} prompts)")
         print(f"Variables : {variables}")
         print(f"Providers : {providers}")
+        print(f"Web search : {'ACTIVE' if args.web_search else 'desactive'}")
         print(f"Marque : {args.brand}")
         print(f"Concurrents : {competitors}")
         print()
@@ -311,7 +387,7 @@ def main():
 
     results = []
     total = len(persona["prompts"]) * len(providers)
-    print(f"Probing {len(persona['prompts'])} prompts x {len(providers)} providers ({total} calls)...", file=sys.stderr)
+    print(f"Probing {len(persona['prompts'])} prompts x {len(providers)} providers ({total} calls). Web search: {'ON' if args.web_search else 'OFF'}", file=sys.stderr)
 
     counter = 0
     for prompt_def in persona["prompts"]:
@@ -319,24 +395,14 @@ def main():
         for provider in providers:
             counter += 1
             print(f"  [{counter}/{total}] {provider} #{prompt_def['id']}", file=sys.stderr)
-            resp = CALLERS[provider](prompt_text, api_keys[provider])
+            resp = CALLERS[provider](prompt_text, api_keys[provider], web_search=args.web_search)
             text = extract_text(provider, resp)
-            citations = extract_citations(provider, resp, text)
+            urls, titles = extract_citations(provider, resp, text)
             mentioned, position = detect_brand(text, args.brand)
             comp_found = detect_competitors(text, competitors)
 
-            sources_text = ""
-            sources_list = []
-            if args.ask_sources and text:
-                print(f"      -> follow-up sources", file=sys.stderr)
-                followup_prompt = (
-                    f"Question initiale : {prompt_text}\n\n"
-                    f"Ta reponse : {text[:1500]}\n\n"
-                    f"{SOURCES_FOLLOWUP}"
-                )
-                resp_src = CALLERS[provider](followup_prompt, api_keys[provider])
-                sources_text = extract_text(provider, resp_src) or ""
-                sources_list = extract_sources(sources_text)
+            # Domaines uniques pour agregation
+            domains = sorted(set(domain_of(u, titles.get(u)) for u in urls))
 
             results.append({
                 "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -344,14 +410,14 @@ def main():
                 "prompt_category": prompt_def["category"],
                 "prompt": prompt_text,
                 "provider": provider,
-                "model": MODELS[provider]["name"],
+                "model": MODELS[provider]["name_search"] if args.web_search else MODELS[provider]["name"],
                 "brand_mentioned": "oui" if mentioned else "non",
                 "brand_position": position,
                 "competitors_found": ", ".join(comp_found),
-                "citations_count": len(citations),
-                "citations": " | ".join(citations[:5]),
-                "sources_cited": " | ".join(sources_list[:10]),
-                "sources_count": len(sources_list),
+                "citations_count": len(urls),
+                "citations": " | ".join(urls[:5]),
+                "domains_count": len(domains),
+                "domains": " | ".join(domains[:10]),
                 "response_text": (text or "")[:600],
                 "error": resp.get("error", "") if isinstance(resp, dict) else "",
             })
@@ -360,7 +426,7 @@ def main():
     fieldnames = [
         "timestamp", "prompt_id", "prompt_category", "provider", "model",
         "brand_mentioned", "brand_position", "competitors_found",
-        "citations_count", "citations", "sources_count", "sources_cited",
+        "citations_count", "citations", "domains_count", "domains",
         "prompt", "response_text", "error",
     ]
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
@@ -396,22 +462,22 @@ def main():
         comp_counts = {}
         for c in all_competitors:
             comp_counts[c] = comp_counts.get(c, 0) + 1
-        # Sources aggregees
-        all_sources = []
+        # Domaines aggregés (sources web search)
+        all_domains = []
         for r in results_p:
-            if r.get("sources_cited"):
-                all_sources.extend([s.strip() for s in r["sources_cited"].split("|") if s.strip()])
-        source_counts = {}
-        for s in all_sources:
-            source_counts[s] = source_counts.get(s, 0) + 1
+            if r.get("domains"):
+                all_domains.extend([d.strip() for d in r["domains"].split("|") if d.strip()])
+        domain_counts = {}
+        for d in all_domains:
+            domain_counts[d] = domain_counts.get(d, 0) + 1
         by_provider[p] = {
             "total": len(results_p),
             "mentioned": len(mentioned),
             "errors": len(errors),
             "mention_rate": round(len(mentioned) / max(len(results_p), 1) * 100, 1),
-            "model": MODELS[p]["name"],
+            "model": results_p[0]["model"] if results_p else MODELS[p]["name"],
             "competitor_counts": sorted(comp_counts.items(), key=lambda x: -x[1]),
-            "source_counts": sorted(source_counts.items(), key=lambda x: -x[1])[:20],
+            "source_counts": sorted(domain_counts.items(), key=lambda x: -x[1])[:20],
         }
 
     html_path = out_dir / "probe-report.html"
@@ -424,6 +490,7 @@ def main():
         by_provider=by_provider,
         results=results,
         variables=variables,
+        web_search=args.web_search,
     )
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)
