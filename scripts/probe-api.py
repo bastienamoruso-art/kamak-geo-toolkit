@@ -328,6 +328,7 @@ def main():
     parser.add_argument("--out", default="./probe-report", help="Dossier de sortie")
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
     parser.add_argument("--web-search", action="store_true", help="Active le web search NATIF sur chaque provider (OpenAI gpt-4o-mini-search-preview, Anthropic tool web_search, Gemini google_search, Perplexity natif). Sources reelles + verifiables. Cout legerement plus eleve.")
+    parser.add_argument("--limit", type=int, default=None, help="Limite le nombre de prompts (defaut: tous). Utile pour test rapide ou budget restreint.")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")
 
     args = parser.parse_args()
@@ -344,6 +345,9 @@ def main():
     if args.persona not in personas:
         sys.exit(f"Erreur : persona '{args.persona}' inconnu. Disponibles : {', '.join(personas.keys())}")
     persona = personas[args.persona]
+    if args.limit:
+        persona = dict(persona)
+        persona["prompts"] = persona["prompts"][:args.limit]
 
     try:
         variables = json.loads(args.variables)
