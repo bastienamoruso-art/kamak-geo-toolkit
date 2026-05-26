@@ -58,6 +58,11 @@ MODELS = {
         "endpoint": "https://api.perplexity.ai/chat/completions",
         "env": "PERPLEXITY_API_KEY",
     },
+    "gemini": {
+        "name": "gemini-2.5-flash",
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "env": "GEMINI_API_KEY",
+    },
     "mistral": {
         "name": "mistral-large-latest",
         "endpoint": "https://api.mistral.ai/v1/chat/completions",
@@ -115,6 +120,14 @@ def call_perplexity(prompt, key):
     )
 
 
+def call_gemini(prompt, key):
+    return _http_post(
+        f"{MODELS['gemini']['endpoint']}?key={key}",
+        {"contents": [{"parts": [{"text": prompt}]}]},
+        {"Content-Type": "application/json"},
+    )
+
+
 def call_mistral(prompt, key):
     return _http_post(
         MODELS["mistral"]["endpoint"],
@@ -127,6 +140,7 @@ CALLERS = {
     "openai": call_openai,
     "anthropic": call_anthropic,
     "perplexity": call_perplexity,
+    "gemini": call_gemini,
     "mistral": call_mistral,
 }
 
@@ -139,6 +153,8 @@ def extract_text(provider, resp):
             return resp["choices"][0]["message"]["content"]
         if provider == "anthropic":
             return resp["content"][0]["text"]
+        if provider == "gemini":
+            return resp["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, TypeError):
         return None
     return None
@@ -196,7 +212,7 @@ def main():
     parser.add_argument("--brand", required=True, help="Votre marque (pour detection mention)")
     parser.add_argument("--competitors", default="", help="Concurrents separes par virgule")
     parser.add_argument("--variables", default="{}", help="JSON inline override des variables")
-    parser.add_argument("--models", default="openai,anthropic,perplexity,mistral", help="Liste providers")
+    parser.add_argument("--models", default="openai,anthropic,perplexity,gemini,mistral", help="Liste providers")
     parser.add_argument("--out", default="./probe-report", help="Dossier de sortie")
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")

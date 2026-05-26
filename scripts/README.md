@@ -139,11 +139,12 @@ open probe-report/probe-report.html
 | OpenAI | `gpt-4o-mini` | Non |
 | Anthropic | `claude-sonnet-4-5` | Non |
 | Perplexity | `sonar` | **Oui** (search temps réel) |
+| Gemini | `gemini-2.5-flash` | Non |
 | Mistral | `mistral-large-latest` | Non |
 
 Pour changer un modèle, éditez le dict `MODELS` en haut de `probe-api.py`. Pas de complication d'argparse — c'est volontaire pour rester lisible.
 
-Les clés API non renseignées sont automatiquement skippées si vous limitez `--models` à ceux que vous avez.
+Si vous n'avez que certaines clés, limitez avec `--models openai,anthropic` par exemple. Les providers non listés sont skippés. Sans clé pour un provider listé, le script s'arrête avec un message clair.
 
 ### Détection mention et concurrents
 
@@ -156,17 +157,18 @@ Pour les sources citées, Perplexity expose un champ `citations` structuré. Pou
 
 ### Coût estimé
 
-Par run complet de 15 prompts sur les 4 providers (60 appels) :
+Par run complet de 15 prompts sur les 5 providers (75 appels) :
 
 | Provider | Coût indicatif |
 |---|---|
 | OpenAI gpt-4o-mini | ~0.02 € |
 | Anthropic Sonnet | ~0.20 € |
 | Perplexity sonar | ~0.30 € |
+| Gemini 2.5 Flash | ~0.02 € (quota gratuit possible) |
 | Mistral Large | ~0.15 € |
 | **Total** | **~0.70 € par persona** |
 
-Soit ~5 € pour les 8 personas. À comparer aux 50-200 €/mois d'un outil GEO commercial.
+Soit ~5 € pour les 8 personas sur les 5 providers. À comparer aux 50-200 €/mois d'un outil GEO commercial.
 
 ### Aide à l'interprétation
 
