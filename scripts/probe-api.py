@@ -906,6 +906,19 @@ def main():
 
     insights = generate_insights(by_provider, args.brand, args.web_search, competitors)
 
+    # Pie chart data : top 5 concurrents par provider + "Autres"
+    pie_data = {}
+    for p, stats in by_provider.items():
+        if stats.get("competitor_counts"):
+            top5 = stats["competitor_counts"][:5]
+            others_sum = sum(n for _, n in stats["competitor_counts"][5:])
+            labels = [c for c, _ in top5]
+            values = [n for _, n in top5]
+            if others_sum > 0:
+                labels.append("Autres")
+                values.append(others_sum)
+            pie_data[p] = {"labels": labels, "values": values, "model": stats["model"]}
+
     html_path = out_dir / "probe-report.html"
     html = template.render(
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -918,6 +931,7 @@ def main():
         variables=variables,
         web_search=args.web_search,
         insights=insights,
+        pie_data=pie_data,
     )
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)

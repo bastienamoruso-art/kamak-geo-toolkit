@@ -43,6 +43,14 @@
   .comp-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .comp-pill { background: var(--bg); padding: 4px 10px; border-radius: 12px; font-family: var(--mono); font-size: 12px; }
 
+  /* Pie chart concurrents */
+  .pie-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .pie-card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .pie-card__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .pie-card__head h3 { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+  .pie-card__model { font-family: var(--mono); font-size: 11px; color: var(--fg-3); }
+  .pie-card__chart { position: relative; height: 240px; }
+
   /* Sources drill-down */
   .source-list { display: flex; flex-direction: column; gap: 6px; }
   .source-item { background: var(--bg); border-radius: 8px; overflow: hidden; }
@@ -219,6 +227,21 @@
   {% if any_competitors.found %}
   <section>
     <h2>Concurrents cités par provider</h2>
+    {% if pie_data %}
+    <div class="pie-grid">
+      {% for provider, data in pie_data.items() %}
+      <div class="pie-card">
+        <div class="pie-card__head">
+          <h3>{{ provider }}</h3>
+          <span class="pie-card__model">{{ data.model }}</span>
+        </div>
+        <div class="pie-card__chart">
+          <canvas id="pie-{{ provider }}"></canvas>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% for provider, stats in by_provider.items() %}
       {% if stats.competitor_counts %}
       <div class="competitors-card">
@@ -348,6 +371,51 @@
     });
   });
 </script>
+
+{% if pie_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const pieData = {{ pie_data | tojson }};
+  // Palette : jaune accent + violet + verts/bleus + neutres
+  const COLORS = ['#f7c724', '#c526f6', '#0edd89', '#27bef7', '#ff8b3d', '#94a3b8'];
+  Object.entries(pieData).forEach(([provider, data]) => {
+    const canvas = document.getElementById(`pie-${provider}`);
+    if (!canvas) return;
+    new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.values,
+          backgroundColor: COLORS.slice(0, data.labels.length),
+          borderColor: '#fff',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { family: 'system-ui, sans-serif', size: 11 }, boxWidth: 10, padding: 8 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = total > 0 ? (ctx.parsed / total * 100).toFixed(0) : 0;
+                return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+</script>
+{% endif %}
 
 </body>
 </html>
