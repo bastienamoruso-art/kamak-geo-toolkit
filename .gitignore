@@ -10,3 +10,7 @@ venv/
 out/
 output/
 reports/
+probe-report/
+report/
+.env
+.env.local

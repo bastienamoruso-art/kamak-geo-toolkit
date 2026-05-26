@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapport probe API — {{ persona.name }} — {{ brand }}</title>
+<style>
+  :root {
+    --primary: #f7c724;
+    --accent: #c526f6;
+    --green: #0edd89;
+    --fg-1: #000;
+    --fg-2: rgba(0,0,0,.7);
+    --fg-3: rgba(0,0,0,.5);
+    --bg: #f5f5f5;
+    --white: #fff;
+    --border: rgba(0,0,0,.08);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Roboto", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--fg-1); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .container { max-width: 1120px; margin: 0 auto; padding: 40px 24px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  .brand { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3); }
+  h1 { font-family: var(--mono); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin-top: 8px; }
+  .meta { color: var(--fg-3); font-size: 13px; margin-top: 12px; font-family: var(--mono); }
+  .meta span { color: var(--fg-1); }
+  .warning { background: var(--primary); color: var(--fg-1); padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; font-family: var(--mono); }
+  section { margin-bottom: 48px; }
+  h2 { font-family: var(--mono); font-size: 24px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .kpi { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .kpi__label { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 8px; }
+  .kpi__value { font-family: var(--mono); font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .kpi__model { font-family: var(--mono); font-size: 12px; color: var(--fg-3); margin-top: 4px; }
+  .kpi__bar { height: 6px; background: var(--border); border-radius: 4px; margin-top: 12px; overflow: hidden; }
+  .kpi__bar-fill { height: 100%; background: var(--primary); }
+  .kpi__sub { font-family: var(--mono); font-size: 12px; color: var(--fg-2); margin-top: 8px; }
+  .kpi__err { color: #c00; font-family: var(--mono); font-size: 11px; margin-top: 4px; }
+  .competitors-card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 16px; }
+  .competitors-card h3 { font-family: var(--mono); font-size: 14px; margin-bottom: 12px; color: var(--fg-2); }
+  .comp-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .comp-pill { background: var(--bg); padding: 4px 10px; border-radius: 12px; font-family: var(--mono); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+  th { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); background: var(--bg); }
+  .mention-yes { color: #0a8; font-family: var(--mono); font-weight: 700; }
+  .mention-no { color: var(--fg-3); font-family: var(--mono); }
+  .pos-pill { display: inline-block; padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 11px; background: var(--primary); }
+  .response-snippet { font-family: var(--mono); font-size: 11px; color: var(--fg-3); max-width: 480px; word-break: break-word; }
+  .provider-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 700; background: var(--bg); }
+  .error-row { background: rgba(255, 0, 0, 0.04); }
+  .error-text { color: #c00; font-family: var(--mono); font-size: 11px; }
+  footer { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 48px; color: var(--fg-3); font-size: 13px; }
+  footer a { color: var(--fg-1); text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">GEO Toolkit / Rapport probe API</div>
+    <h1>{{ brand }} dans <span style="color: var(--accent);">{{ persona.name }}</span></h1>
+    <p class="meta">
+      Persona <span>{{ persona.id }}</span> ·
+      Généré le <span>{{ generated_at }}</span> ·
+      <span>{{ results|length }}</span> appels API
+      {% if competitors %}· concurrents : <span>{{ competitors|join(", ") }}</span>{% endif %}
+    </p>
+    {% if variables %}
+    <p class="meta">Variables : {% for k, v in variables.items() %}<span>{{ k }}</span>={{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+    {% endif %}
+    <div class="warning">
+      L'API n'est pas l'interface réelle — pas d'historique utilisateur, pas de géolocalisation, pas de routing dynamique entre versions du modèle. Utilisez ces données pour la <strong>tendance</strong>, croisez avec le test manuel pour la <strong>vérité prospect</strong>.
+    </div>
+  </header>
+
+  <section>
+    <h2>Vue d'ensemble par provider</h2>
+    <div class="kpis">
+      {% for provider, stats in by_provider.items() %}
+      <div class="kpi">
+        <div class="kpi__label">{{ provider }}</div>
+        <div class="kpi__value">{{ stats.mention_rate }} %</div>
+        <div class="kpi__model">{{ stats.model }}</div>
+        <div class="kpi__bar">
+          <div class="kpi__bar-fill" style="width: {{ stats.mention_rate }}%;"></div>
+        </div>
+        <div class="kpi__sub">{{ stats.mentioned }} mentions / {{ stats.total }} prompts</div>
+        {% if stats.errors > 0 %}<div class="kpi__err">{{ stats.errors }} erreur(s) API</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% set any_competitors = namespace(found=false) %}
+  {% for provider, stats in by_provider.items() %}{% if stats.competitor_counts %}{% set any_competitors.found = true %}{% endif %}{% endfor %}
+  {% if any_competitors.found %}
+  <section>
+    <h2>Concurrents cités par provider</h2>
+    {% for provider, stats in by_provider.items() %}
+      {% if stats.competitor_counts %}
+      <div class="competitors-card">
+        <h3>{{ provider }} — {{ stats.model }}</h3>
+        <div class="comp-list">
+          {% for comp, count in stats.competitor_counts %}
+          <span class="comp-pill">{{ comp }} · {{ count }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Détail prompt par prompt</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Catégorie</th>
+          <th>Provider</th>
+          <th>Marque</th>
+          <th>Position</th>
+          <th>Concurrents</th>
+          <th>Sources</th>
+          <th>Extrait de réponse</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr {% if r.error %}class="error-row"{% endif %}>
+          <td>{{ r.prompt_id }}</td>
+          <td>{{ r.prompt_category }}</td>
+          <td><span class="provider-pill">{{ r.provider }}</span></td>
+          <td>
+            {% if r.brand_mentioned == "oui" %}<span class="mention-yes">oui</span>{% else %}<span class="mention-no">non</span>{% endif %}
+          </td>
+          <td>{% if r.brand_position %}<span class="pos-pill">{{ r.brand_position }}</span>{% endif %}</td>
+          <td>{{ r.competitors_found }}</td>
+          <td>{{ r.citations_count }}</td>
+          <td>
+            {% if r.error %}<span class="error-text">{{ r.error }}</span>{% else %}<span class="response-snippet">{{ r.response_text }}</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    Généré par <a href="https://github.com/bastienamoruso-art/kamak-geo-toolkit">kamak-geo-toolkit</a>
+    · Bastien Amoruso / <a href="https://kamak.ai">KAMAK</a> · MIT
+  </footer>
+</div>
+</body>
+</html>
