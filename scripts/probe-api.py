@@ -38,6 +38,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -294,6 +295,133 @@ def substitute(prompt, variables):
     return prompt
 
 
+SOURCE_NOISE = {"google.com", "youtube.com", "vertexaisearch.cloud.google.com", "wikipedia.org", "fr.wikipedia.org", "calendar.google.com"}
+SOURCE_INSTITUTIONNELLES = {"orias.fr", "amf-france.org", "anil.org", "service-public.fr", "economie.gouv.fr", "banque-france.fr", "cncgp.fr", "anacofi.asso.fr"}
+
+
+def generate_insights(by_provider, brand, web_search, competitors):
+    """Genere une liste d'insights actionnables a partir des stats agregees."""
+    insights = []
+    if not by_provider:
+        return insights
+
+    total_mentions = sum(s["mentioned"] for s in by_provider.values())
+    total_calls = sum(s["total"] for s in by_provider.values())
+    global_rate = total_mentions / max(total_calls, 1) * 100
+
+    # 1. Verdict global mention marque
+    if global_rate == 0:
+        insights.append({
+            "type": "critical",
+            "title": f"{brand} absent de tous les providers",
+            "detail": (
+                f"0 mention sur {total_calls} prompts. "
+                + (
+                    "En mode web search, votre SEO ne vous remonte pas sur ces requêtes. Action : vérifier le ranking Google sur les prompts, et travailler la pression de marque (mentions tierces, comparateurs)."
+                    if web_search
+                    else "Sans web search : votre marque n'est pas dans le corpus d'entraînement des modèles. Action prioritaire : pression de marque (PR, citations, Wikipedia, mentions par sites d'autorité). Relancez avec --web-search pour mesurer votre SEO réel."
+                )
+            ),
+        })
+    elif global_rate < 20:
+        insights.append({
+            "type": "warning",
+            "title": f"{brand} marginalement présent ({global_rate:.0f}%)",
+            "detail": f"{total_mentions} mentions sur {total_calls} prompts. Présence faible. Identifiez les prompts gagnants (en filtrant par provider dans la table ci-dessous) et étendez aux catégories voisines (FAQ, comparaison).",
+        })
+    elif global_rate < 50:
+        insights.append({
+            "type": "info",
+            "title": f"{brand} présent mais non dominant ({global_rate:.0f}%)",
+            "detail": f"{total_mentions} mentions sur {total_calls} prompts. Vous êtes connu. Action : capitaliser sur les recommandations (catégorie 'recommandation') où vous n'êtes pas encore cité.",
+        })
+    else:
+        insights.append({
+            "type": "ok",
+            "title": f"{brand} bien représenté ({global_rate:.0f}%)",
+            "detail": f"{total_mentions} mentions sur {total_calls} prompts. Position forte. Action : monitorer mois après mois pour ne pas perdre la position. Vérifier que les concurrents montants ne vous dépassent pas.",
+        })
+
+    # 2. Disparités entre providers
+    rates = [(p, s["mention_rate"]) for p, s in by_provider.items() if s["total"] > 0]
+    rates.sort(key=lambda x: -x[1])
+    if len(rates) > 1:
+        best, worst = rates[0], rates[-1]
+        if best[1] - worst[1] >= 30:
+            insights.append({
+                "type": "info",
+                "title": f"Disparité forte : {best[0]} ({best[1]:.0f}%) vs {worst[0]} ({worst[1]:.0f}%)",
+                "detail": (
+                    f"Vous êtes mieux indexé par certains corpus que d'autres. "
+                    + (
+                        "En mode search, c'est lié aux moteurs sous-jacents (Bing pour OpenAI, Google pour Gemini)."
+                        if web_search
+                        else "Indique que vos contenus sont dans certains corpus de training et pas d'autres. Travailler la diffusion (Common Crawl, Wikipedia, médias d'autorité)."
+                    )
+                ),
+            })
+
+    # 3. Concurrent leader
+    all_comp = Counter()
+    for s in by_provider.values():
+        for c, n in s.get("competitor_counts", []):
+            all_comp[c] += n
+    if all_comp:
+        top_comp, top_n = all_comp.most_common(1)[0]
+        second = all_comp.most_common(2)[1] if len(all_comp) > 1 else None
+        detail = f"{top_n} mentions cumulées sur {len(by_provider)} providers. C'est le concurrent que les modèles voient comme référence sur ce persona."
+        if second:
+            detail += f" Second : {second[0]} ({second[1]} mentions)."
+        detail += " Analysez sur quels sites/contenus ce concurrent est cité pour comprendre l'écart."
+        insights.append({
+            "type": "info",
+            "title": f"Concurrent dominant aux yeux des IA : {top_comp}",
+            "detail": detail,
+        })
+
+    # 4. Top sources (uniquement si web search)
+    if web_search:
+        all_src = Counter()
+        for s in by_provider.values():
+            for src, n in s.get("source_counts", []):
+                all_src[src] += n
+        # Filtrer les sources de bruit (google, youtube, etc.)
+        filtered = [(s, n) for s, n in all_src.most_common() if s.lower() not in SOURCE_NOISE]
+        # Marque elle-meme citée ?
+        brand_lower = brand.lower()
+        brand_self_cited = [(s, n) for s, n in filtered if brand_lower in s.lower()]
+        institutionnel = [(s, n) for s, n in filtered if s.lower() in SOURCE_INSTITUTIONNELLES]
+        autres = [(s, n) for s, n in filtered if s.lower() not in SOURCE_INSTITUTIONNELLES and brand_lower not in s.lower()][:5]
+
+        if autres:
+            top_str = ", ".join(f"<strong>{s}</strong> ({n})" for s, n in autres[:3])
+            insights.append({
+                "type": "action",
+                "title": "Top sources à viser",
+                "detail": (
+                    f"Les modèles puisent dans : {top_str}. Action : présence + contenu sur ces sites = leverage direct pour entrer dans le corpus. "
+                    f"Vérifier que vos pages sont sur ces sites (fiches annuaires, articles invités, avis clients)."
+                ),
+            })
+
+        if brand_self_cited:
+            insights.append({
+                "type": "ok",
+                "title": f"Votre site est cité comme source",
+                "detail": f"{brand_self_cited[0][0]} ressort {brand_self_cited[0][1]} fois. Bon signal SEO : votre propre contenu remonte dans les sources des modèles.",
+            })
+
+        if institutionnel:
+            inst_str = ", ".join(f"<strong>{s}</strong>" for s, _ in institutionnel[:3])
+            insights.append({
+                "type": "info",
+                "title": "Sources institutionnelles citées",
+                "detail": f"Les modèles s'appuient sur {inst_str}. Vérifiez que votre marque est correctement référencée et trouvable sur ces sites d'autorité (ex: fiche ORIAS visible publiquement).",
+            })
+
+    return insights
+
+
 def domain_of(url, title=None):
     """Extrait le domaine d'une URL pour agrégation.
     Si l'URL est une redirection (Vertex AI Gemini), tente de tirer le domaine du titre."""
@@ -308,20 +436,145 @@ def domain_of(url, title=None):
     return m.group(1).lower() if m else url
 
 
+def wizard(personas_data, prompts_path):
+    """Mode interactif step-by-step. Retourne un dict de params."""
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    YELLOW = "\033[33m"
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    CYAN = "\033[36m"
+    RESET = "\033[0m"
+
+    print()
+    print(f"{BOLD}╭─ KAMAK GEO Toolkit · Probe API · Wizard ─╮{RESET}")
+    print(f"{DIM}Sources prompts: {prompts_path}{RESET}")
+    print()
+
+    personas_list = personas_data["personas"]
+
+    # 1. Persona
+    print(f"{BOLD}[1/7] Persona{RESET}")
+    for i, p in enumerate(personas_list, 1):
+        print(f"  {i:>2}. {CYAN}{p['id']}{RESET} — {p['name']}")
+    while True:
+        choice = input(f"{DIM}Choix (1-{len(personas_list)}) : {RESET}").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(personas_list):
+                persona = personas_list[idx]
+                break
+        except ValueError:
+            pass
+        print(f"{RED}  Choix invalide.{RESET}")
+
+    # 2. Marque
+    print()
+    print(f"{BOLD}[2/7] Marque{RESET} {DIM}(pour détection mention dans les réponses){RESET}")
+    brand = ""
+    while not brand:
+        brand = input(f"{DIM}Marque : {RESET}").strip()
+        if not brand:
+            print(f"{RED}  Obligatoire.{RESET}")
+
+    # 3. Concurrents
+    print()
+    print(f"{BOLD}[3/7] Concurrents{RESET} {DIM}(séparés par virgule, optionnel){RESET}")
+    competitors_raw = input(f"{DIM}Concurrents : {RESET}").strip()
+    competitors = [c.strip() for c in competitors_raw.split(",") if c.strip()]
+
+    # 4. Variables
+    print()
+    print(f"{BOLD}[4/7] Variables du persona{RESET}")
+    variables = {}
+    for var in persona.get("variables", []):
+        val = input(f"  {CYAN}{var}{RESET} = ").strip()
+        if val:
+            variables[var] = val
+
+    # 5. Providers
+    print()
+    print(f"{BOLD}[5/7] Providers{RESET}")
+    available = []
+    for p in ["openai", "anthropic", "perplexity", "gemini"]:
+        if os.environ.get(MODELS[p]["env"]):
+            print(f"  {GREEN}✓{RESET} {p} {DIM}(clé OK){RESET}")
+            available.append(p)
+        else:
+            print(f"  {RED}✗{RESET} {p} {DIM}({MODELS[p]['env']} absente — skippé){RESET}")
+    if not available:
+        sys.exit(f"{RED}Aucune clé API. Renseignez au moins une variable d'env.{RESET}")
+    default_str = ",".join(available)
+    choice = input(f"{DIM}Liste (Enter = {default_str}) : {RESET}").strip()
+    if choice:
+        providers = [p.strip() for p in choice.split(",") if p.strip() in available]
+        if not providers:
+            providers = available
+    else:
+        providers = available
+
+    # 6. Web search
+    print()
+    ws_choice = input(f"{BOLD}[6/7] Web search natif ?{RESET} {DIM}(sources réelles, ~+30% coût) [O/n] : {RESET}").strip().lower()
+    web_search = ws_choice not in ("n", "no", "non")
+
+    # 7. Limit
+    print()
+    nb_prompts = len(persona["prompts"])
+    limit_raw = input(f"{BOLD}[7/7] Limit prompts{RESET} {DIM}(Enter = tous = {nb_prompts}) : {RESET}").strip()
+    limit = None
+    if limit_raw.isdigit():
+        limit = max(1, min(int(limit_raw), nb_prompts))
+
+    effective_count = limit or nb_prompts
+    total_calls = effective_count * len(providers)
+    # Coût indicatif (cents) : sans search ~0.5c/call, avec search ~1.5c/call
+    cost_estimate = total_calls * (0.015 if web_search else 0.005)
+
+    print()
+    print(f"{BOLD}━━━ Récapitulatif ━━━{RESET}")
+    print(f"  Persona       : {CYAN}{persona['id']}{RESET} ({effective_count} prompts)")
+    print(f"  Marque        : {YELLOW}{brand}{RESET}")
+    print(f"  Concurrents   : {', '.join(competitors) if competitors else DIM + '(aucun)' + RESET}")
+    if variables:
+        print(f"  Variables     : {', '.join(f'{k}={v}' for k,v in variables.items())}")
+    print(f"  Providers     : {', '.join(providers)} ({len(providers)})")
+    print(f"  Web search    : {GREEN if web_search else RED}{'ON' if web_search else 'OFF'}{RESET}")
+    print(f"  Calls totaux  : {BOLD}{total_calls}{RESET}")
+    print(f"  Coût estimé   : {BOLD}~{cost_estimate:.2f} €{RESET}")
+    print()
+    confirm = input(f"{BOLD}Lancer ? [O/n] : {RESET}").strip().lower()
+    if confirm in ("n", "no", "non"):
+        sys.exit("Abandonné.")
+
+    return {
+        "persona_id": persona["id"],
+        "brand": brand,
+        "competitors": competitors,
+        "variables": variables,
+        "providers": providers,
+        "web_search": web_search,
+        "limit": limit,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Probe les APIs LLM pour mesurer la visibilité IA d'une marque.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Exemple :\n"
+            "Mode wizard (recommandé) :\n"
+            "  python probe-api.py --wizard\n\n"
+            "Mode direct :\n"
             "  python probe-api.py --persona 01-cgp-courtier --brand 'Aeconomia' \\\n"
             "    --competitors 'Cafpi,Empruntis' --web-search \\\n"
             "    --variables '{\"VILLE\":\"Orléans\",\"ZONE\":\"Loiret\"}'\n"
         ),
     )
+    parser.add_argument("--wizard", action="store_true", help="Mode interactif step-by-step (recommande pour debut)")
     parser.add_argument("--prompts", default=None, help="Chemin prompts.json (defaut: ../prompts/prompts.json)")
-    parser.add_argument("--persona", required=True, help="ID persona (ex: 01-cgp-courtier)")
-    parser.add_argument("--brand", required=True, help="Votre marque (pour detection mention)")
+    parser.add_argument("--persona", default=None, help="ID persona (ex: 01-cgp-courtier) - requis sans --wizard")
+    parser.add_argument("--brand", default=None, help="Votre marque (pour detection mention) - requis sans --wizard")
     parser.add_argument("--competitors", default="", help="Concurrents separes par virgule")
     parser.add_argument("--variables", default="{}", help="JSON inline override des variables")
     parser.add_argument("--models", default="openai,anthropic,perplexity,gemini", help="Liste providers (defaut: openai,anthropic,perplexity,gemini ; mistral disponible mais opt-in)")
@@ -342,6 +595,23 @@ def main():
         data = json.load(f)
 
     personas = {p["id"]: p for p in data["personas"]}
+
+    # Mode wizard : remplit les args manquants en interactif
+    if args.wizard:
+        wiz = wizard(data, prompts_path)
+        args.persona = wiz["persona_id"]
+        args.brand = wiz["brand"]
+        args.competitors = ",".join(wiz["competitors"])
+        args.variables = json.dumps(wiz["variables"])
+        args.models = ",".join(wiz["providers"])
+        args.web_search = wiz["web_search"]
+        args.limit = wiz["limit"]
+
+    # Validation post-wizard
+    if not args.persona:
+        sys.exit("Erreur : --persona requis (ou utiliser --wizard pour mode interactif).")
+    if not args.brand:
+        sys.exit("Erreur : --brand requis (ou utiliser --wizard pour mode interactif).")
     if args.persona not in personas:
         sys.exit(f"Erreur : persona '{args.persona}' inconnu. Disponibles : {', '.join(personas.keys())}")
     persona = personas[args.persona]
@@ -405,6 +675,8 @@ def main():
             mentioned, position = detect_brand(text, args.brand)
             comp_found = detect_competitors(text, competitors)
 
+            # Liste (url, title) pour drill-down dans le HTML
+            citations_pairs = [(u, titles.get(u, "")) for u in urls]
             # Domaines uniques pour agregation
             domains = sorted(set(domain_of(u, titles.get(u)) for u in urls))
 
@@ -420,6 +692,7 @@ def main():
                 "competitors_found": ", ".join(comp_found),
                 "citations_count": len(urls),
                 "citations": " | ".join(urls[:5]),
+                "citations_pairs": citations_pairs,  # in-memory only, not in CSV
                 "domains_count": len(domains),
                 "domains": " | ".join(domains[:10]),
                 "response_text": (text or "")[:600],
@@ -466,14 +739,31 @@ def main():
         comp_counts = {}
         for c in all_competitors:
             comp_counts[c] = comp_counts.get(c, 0) + 1
-        # Domaines aggregés (sources web search)
-        all_domains = []
-        for r in results_p:
-            if r.get("domains"):
-                all_domains.extend([d.strip() for d in r["domains"].split("|") if d.strip()])
+        # Domaines aggregés avec drill-down (URLs spécifiques + titres + prompt_id)
         domain_counts = {}
-        for d in all_domains:
-            domain_counts[d] = domain_counts.get(d, 0) + 1
+        domain_urls = {}  # {domain: [{url, title, prompt_id}]}
+        for r in results_p:
+            for url, title in r.get("citations_pairs", []):
+                dom = domain_of(url, title)
+                domain_counts[dom] = domain_counts.get(dom, 0) + 1
+                if dom not in domain_urls:
+                    domain_urls[dom] = []
+                # Dédup par URL
+                if not any(u["url"] == url for u in domain_urls[dom]):
+                    domain_urls[dom].append({
+                        "url": url,
+                        "title": title or "",
+                        "prompt_id": r["prompt_id"],
+                    })
+        # Top 20 sources avec leurs URLs détaillées
+        sorted_sources = sorted(domain_counts.items(), key=lambda x: -x[1])[:20]
+        source_detail = []
+        for dom, count in sorted_sources:
+            source_detail.append({
+                "domain": dom,
+                "count": count,
+                "urls": domain_urls.get(dom, []),
+            })
         by_provider[p] = {
             "total": len(results_p),
             "mentioned": len(mentioned),
@@ -481,8 +771,11 @@ def main():
             "mention_rate": round(len(mentioned) / max(len(results_p), 1) * 100, 1),
             "model": results_p[0]["model"] if results_p else MODELS[p]["name"],
             "competitor_counts": sorted(comp_counts.items(), key=lambda x: -x[1]),
-            "source_counts": sorted(domain_counts.items(), key=lambda x: -x[1])[:20],
+            "source_counts": sorted_sources,  # compat retro pour insights
+            "source_detail": source_detail,
         }
+
+    insights = generate_insights(by_provider, args.brand, args.web_search, competitors)
 
     html_path = out_dir / "probe-report.html"
     html = template.render(
@@ -495,6 +788,7 @@ def main():
         results=results,
         variables=variables,
         web_search=args.web_search,
+        insights=insights,
     )
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)

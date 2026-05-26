@@ -42,6 +42,26 @@
   .competitors-card h3 { font-family: var(--mono); font-size: 14px; margin-bottom: 12px; color: var(--fg-2); }
   .comp-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .comp-pill { background: var(--bg); padding: 4px 10px; border-radius: 12px; font-family: var(--mono); font-size: 12px; }
+
+  /* Sources drill-down */
+  .source-list { display: flex; flex-direction: column; gap: 6px; }
+  .source-item { background: var(--bg); border-radius: 8px; overflow: hidden; }
+  .source-item summary { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; list-style: none; font-family: var(--mono); font-size: 12px; transition: background 0.15s; }
+  .source-item summary:hover { background: rgba(247,199,36,0.2); }
+  .source-item summary::-webkit-details-marker { display: none; }
+  .source-item[open] summary { background: var(--primary); }
+  .src-domain { font-weight: 700; }
+  .src-count { background: var(--white); color: var(--fg-1); padding: 1px 8px; border-radius: 10px; font-size: 11px; }
+  .source-item[open] .src-count { background: var(--fg-1); color: var(--white); }
+  .src-toggle { margin-left: auto; color: var(--fg-3); transition: transform 0.15s; }
+  .source-item[open] .src-toggle { transform: rotate(180deg); }
+  .src-urls { list-style: none; padding: 8px 12px; background: var(--white); }
+  .src-urls li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .src-urls li:last-child { border-bottom: 0; }
+  .src-urls a { color: var(--fg-1); text-decoration: none; font-weight: 500; font-size: 13px; word-break: break-word; }
+  .src-urls a:hover { color: var(--accent); text-decoration: underline; }
+  .src-url-meta { font-family: var(--mono); font-size: 10px; color: var(--fg-3); margin-left: 8px; }
+  .src-url-raw { font-family: var(--mono); font-size: 10px; color: var(--fg-3); margin-top: 2px; word-break: break-all; }
   table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
   th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
   th { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); background: var(--bg); }
@@ -56,6 +76,20 @@
   .provider-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 700; background: var(--bg); }
   .error-row { background: rgba(255, 0, 0, 0.04); }
   .error-text { color: #c00; font-family: var(--mono); font-size: 11px; }
+
+  /* Insights / plan d'action */
+  .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 32px; }
+  .insight { background: var(--white); border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,.06); border-left: 4px solid var(--border); }
+  .insight--critical { border-left-color: #c00; background: linear-gradient(to right, rgba(204,0,0,0.04), var(--white) 30%); }
+  .insight--warning  { border-left-color: var(--primary); background: linear-gradient(to right, rgba(247,199,36,0.10), var(--white) 30%); }
+  .insight--info     { border-left-color: var(--accent); }
+  .insight--ok       { border-left-color: var(--green); }
+  .insight--action   { border-left-color: var(--primary); background: var(--primary); }
+  .insight__type     { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 4px; }
+  .insight--action .insight__type { color: rgba(0,0,0,.6); }
+  .insight__title    { font-family: var(--mono); font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .insight__detail   { font-size: 13px; line-height: 1.55; color: var(--fg-2); }
+  .insight--action .insight__detail { color: var(--fg-1); }
 
   /* Section interpretation pliable */
   details.interpretation { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 32px; }
@@ -104,6 +138,21 @@
     <p class="meta">Variables : {% for k, v in variables.items() %}<span>{{ k }}</span>={{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
     {% endif %}
   </header>
+
+  {% if insights %}
+  <section>
+    <h2>Plan d'action <span style="color: var(--fg-3); font-size: 14px; font-family: var(--sans);">— synthèse auto-générée à partir des données ci-dessous</span></h2>
+    <div class="insights">
+      {% for ins in insights %}
+      <div class="insight insight--{{ ins.type }}">
+        <div class="insight__type">{{ ins.type }}</div>
+        <div class="insight__title">{{ ins.title }}</div>
+        <div class="insight__detail">{{ ins.detail|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <details class="interpretation">
     <summary>Comment lire ce rapport</summary>
@@ -186,12 +235,12 @@
   {% endif %}
 
   {% set any_sources = namespace(found=false) %}
-  {% for provider, stats in by_provider.items() %}{% if stats.source_counts %}{% set any_sources.found = true %}{% endif %}{% endfor %}
+  {% for provider, stats in by_provider.items() %}{% if stats.source_detail %}{% set any_sources.found = true %}{% endif %}{% endfor %}
   {% if any_sources.found %}
   <section>
     <h2>Sources web citées par provider
       <span style="color: var(--fg-3); font-size: 14px; font-family: var(--sans);">
-        {% if web_search %}— web search natif activé · domaines vérifiables{% else %}— URLs extraites du texte de réponse (sans web search){% endif %}
+        {% if web_search %}— cliquez un domaine pour voir les URLs exactes{% else %}— URLs extraites du texte de réponse (sans web search){% endif %}
       </span>
     </h2>
     {% if not web_search %}
@@ -200,12 +249,27 @@
     </p>
     {% endif %}
     {% for provider, stats in by_provider.items() %}
-      {% if stats.source_counts %}
+      {% if stats.source_detail %}
       <div class="competitors-card">
         <h3>{{ provider }} — {{ stats.model }}</h3>
-        <div class="comp-list">
-          {% for src, count in stats.source_counts %}
-          <span class="comp-pill" style="background: var(--primary);">{{ src }} · {{ count }}</span>
+        <div class="source-list">
+          {% for src in stats.source_detail %}
+          <details class="source-item">
+            <summary>
+              <span class="src-domain">{{ src.domain }}</span>
+              <span class="src-count">{{ src.count }}</span>
+              <span class="src-toggle">▾</span>
+            </summary>
+            <ul class="src-urls">
+              {% for u in src.urls %}
+              <li>
+                <a href="{{ u.url }}" target="_blank" rel="noopener noreferrer">{{ u.title or u.url }}</a>
+                <span class="src-url-meta">prompt #{{ u.prompt_id }}</span>
+                {% if u.title %}<div class="src-url-raw">{{ u.url }}</div>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </details>
           {% endfor %}
         </div>
       </div>

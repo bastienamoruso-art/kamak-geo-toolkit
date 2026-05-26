@@ -91,7 +91,7 @@ Parce que ce que les outils GEO du marché vendent 50-200 €/mois est essentiel
 
 **Limite à connaître** : l'API n'est PAS l'interface réelle. Pas d'historique utilisateur, pas d'abonnement, pas de géolocalisation, pas de routing dynamique entre versions du modèle. À utiliser pour la **tendance** et la **scale**, à croiser avec le test manuel pour la **vérité prospect**.
 
-### Quickstart
+### Quickstart — mode wizard (recommandé)
 
 ```bash
 # 1. Configurer les clés
@@ -99,7 +99,25 @@ cp .env.example .env
 # Éditer .env, puis :
 set -a; source .env; set +a
 
-# 2. Dry-run pour voir les prompts substitués sans dépenser de tokens
+# 2. Lancer le wizard interactif
+python probe-api.py --wizard
+```
+
+Le wizard vous demande step-by-step :
+1. Persona (liste les 8 disponibles)
+2. Marque
+3. Concurrents
+4. Variables du persona (VILLE, ZONE, etc.)
+5. Providers (détecte automatiquement les clés API présentes)
+6. Web search ON/OFF
+7. Limit prompts
+
+Puis affiche un récap (calls totaux + coût estimé) avant confirmation.
+
+### Mode direct (CLI)
+
+```bash
+# Dry-run pour voir les prompts substitués sans dépenser de tokens
 python probe-api.py \
   --persona 01-cgp-courtier \
   --brand "Aeconomia" \
@@ -107,12 +125,14 @@ python probe-api.py \
   --variables '{"VILLE":"Orléans","ZONE":"Loiret","TICKET":"250 000 €","SPECIALITE":"primo-accédants"}' \
   --dry-run
 
-# 3. Run complet
+# Run complet avec web search natif (sources réelles vérifiables)
 python probe-api.py \
   --persona 01-cgp-courtier \
   --brand "Aeconomia" \
   --competitors "Cafpi,Empruntis,Meilleurtaux" \
   --variables '{"VILLE":"Orléans","ZONE":"Loiret","TICKET":"250 000 €","SPECIALITE":"primo-accédants"}' \
+  --web-search \
+  --limit 5 \
   --out ./probe-report
 
 open probe-report/probe-report.html
