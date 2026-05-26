@@ -113,6 +113,26 @@
   </section>
   {% endif %}
 
+  {% set any_sources = namespace(found=false) %}
+  {% for provider, stats in by_provider.items() %}{% if stats.source_counts %}{% set any_sources.found = true %}{% endif %}{% endfor %}
+  {% if any_sources.found %}
+  <section>
+    <h2>Sources citées par provider <span style="color: var(--fg-3); font-size: 14px; font-family: var(--sans);">— les sites/médias où placer votre marque pour entrer dans le corpus</span></h2>
+    {% for provider, stats in by_provider.items() %}
+      {% if stats.source_counts %}
+      <div class="competitors-card">
+        <h3>{{ provider }} — {{ stats.model }}</h3>
+        <div class="comp-list">
+          {% for src, count in stats.source_counts %}
+          <span class="comp-pill" style="background: var(--primary);">{{ src }} · {{ count }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <section>
     <h2>Détail prompt par prompt</h2>
     <table>

@@ -126,11 +126,24 @@ open probe-report/probe-report.html
 | `--brand` | — | Votre marque (obligatoire — pour détection mention) |
 | `--competitors` | `""` | Concurrents séparés par virgule |
 | `--variables` | `{}` | JSON inline override des variables (`VILLE`, `ZONE`, etc.) |
-| `--models` | `openai,anthropic,perplexity,mistral` | Liste providers à interroger |
+| `--models` | `openai,anthropic,perplexity,gemini` | Liste providers à interroger (Mistral disponible mais opt-in) |
 | `--prompts` | `../prompts/prompts.json` | Chemin custom prompts.json |
 | `--out` | `./probe-report` | Dossier de sortie |
 | `--csv-only` | `false` | Saute la génération HTML |
+| `--ask-sources` | `false` | **Ajoute un 2e appel par prompt** demandant les sources/sites que le modèle utilise (double le coût, mais ramène la liste actionnable des sites à viser pour entrer dans le corpus) |
 | `--dry-run` | `false` | Affiche les prompts substitués sans appeler les APIs |
+
+### À quoi sert `--ask-sources` (recommandé pour avoir un plan d'action)
+
+Les modèles non-search (OpenAI, Anthropic, Gemini sans web tool) ne ramènent quasi jamais d'URLs explicites dans leurs réponses. Vous savez qu'un concurrent est cité, mais pas **par quelle source** le modèle puise cette info. Or, c'est précisément ce qu'il faut viser pour entrer dans leur prochain corpus d'entraînement.
+
+Avec `--ask-sources`, le script enchaîne un 2e appel par prompt :
+
+> *« Pour cette réponse, sur quels sites web, comparateurs, médias te bases-tu généralement ? Liste 5 sources concrètes avec URL si possible. »*
+
+Les sources retournées (URLs, noms de domaines, noms de médias) sont extraites, agrégées par provider, et affichées dans le rapport HTML sous **« Sources citées »**. Vous obtenez votre **plan d'action SEO/PR** : les sites à cibler pour faire connaître votre marque aux modèles.
+
+⚠️ Le modèle peut halluciner des URLs (forme correcte mais inexistantes). Les **noms de domaines courants** (`meilleurtaux.com`, `service-public.fr`) sont fiables ; les URLs profondes (`https://example.com/article-xyz`) sont à vérifier avant action.
 
 ### Providers et modèles utilisés
 

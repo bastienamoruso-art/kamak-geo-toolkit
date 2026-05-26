@@ -162,8 +162,19 @@ def extract_text(provider, resp):
 
 URL_RE = re.compile(r"https?://[^\s\)\]\,\"\<\>]+")
 
+# Domaines mentionnés sans http:// : "meilleurtaux.com", "cbanque.fr", "lefigaro.fr", etc.
+DOMAIN_RE = re.compile(r"\b((?:[a-z0-9-]+\.){1,3}(?:fr|com|net|org|info|eu|io|ai))\b", re.IGNORECASE)
+
+# Mentions de medias/sites par leur nom (pattern "selon X", "X.fr", marques connues)
+NAMED_SOURCE_RE = re.compile(
+    r"(?:selon|d'apres|cite par|source\s*:|sites?\s+comme|comparateurs?\s+comme|via)\s+"
+    r"([A-Z][A-Za-z0-9\-\s&'\.]{2,40}?)(?:[\,\.\;\:\)]|$| qui| permet)",
+    re.IGNORECASE,
+)
+
 
 def extract_citations(provider, resp, text):
+    """URLs explicites uniquement (pour rapport actuel)."""
     if not isinstance(resp, dict) or "error" in resp or not text:
         return []
     urls = set()
@@ -171,6 +182,32 @@ def extract_citations(provider, resp, text):
         urls.update(resp["citations"])
     urls.update(URL_RE.findall(text))
     return sorted(urls)
+
+
+def extract_sources(text):
+    """Extraction large : URLs + domaines mentionnes + sources nommees."""
+    if not text:
+        return []
+    sources = set()
+    # URLs explicites
+    for u in URL_RE.findall(text):
+        sources.add(u.rstrip(".,;:)"))
+    # Domaines mentionnes sans http (genre "meilleurtaux.com")
+    for d in DOMAIN_RE.findall(text):
+        sources.add(d.lower())
+    # Sources nommees (selon X, sites comme Y)
+    for m in NAMED_SOURCE_RE.findall(text):
+        clean = m.strip().rstrip(".,;:")
+        if 3 <= len(clean) <= 40:
+            sources.add(clean)
+    return sorted(sources)
+
+
+SOURCES_FOLLOWUP = (
+    "Pour cette reponse, sur quels sites web, comparateurs, medias ou sources "
+    "te bases-tu generalement ? Liste 5 sources concretes en donnant le nom du site "
+    "ou son URL si possible. Reponse au format liste, pas de phrase d'intro."
+)
 
 
 def detect_brand(text, brand):
@@ -216,6 +253,7 @@ def main():
     parser.add_argument("--out", default="./probe-report", help="Dossier de sortie")
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")
+    parser.add_argument("--ask-sources", action="store_true", help="Pour chaque prompt, ajoute un 2e appel demandant les sources que le modele utilise (double le cout, mais ramene les sites/medias a viser)")
 
     args = parser.parse_args()
 
@@ -286,6 +324,20 @@ def main():
             citations = extract_citations(provider, resp, text)
             mentioned, position = detect_brand(text, args.brand)
             comp_found = detect_competitors(text, competitors)
+
+            sources_text = ""
+            sources_list = []
+            if args.ask_sources and text:
+                print(f"      -> follow-up sources", file=sys.stderr)
+                followup_prompt = (
+                    f"Question initiale : {prompt_text}\n\n"
+                    f"Ta reponse : {text[:1500]}\n\n"
+                    f"{SOURCES_FOLLOWUP}"
+                )
+                resp_src = CALLERS[provider](followup_prompt, api_keys[provider])
+                sources_text = extract_text(provider, resp_src) or ""
+                sources_list = extract_sources(sources_text)
+
             results.append({
                 "timestamp": datetime.now().isoformat(timespec="seconds"),
                 "prompt_id": prompt_def["id"],
@@ -298,6 +350,8 @@ def main():
                 "competitors_found": ", ".join(comp_found),
                 "citations_count": len(citations),
                 "citations": " | ".join(citations[:5]),
+                "sources_cited": " | ".join(sources_list[:10]),
+                "sources_count": len(sources_list),
                 "response_text": (text or "")[:600],
                 "error": resp.get("error", "") if isinstance(resp, dict) else "",
             })
@@ -306,7 +360,8 @@ def main():
     fieldnames = [
         "timestamp", "prompt_id", "prompt_category", "provider", "model",
         "brand_mentioned", "brand_position", "competitors_found",
-        "citations_count", "citations", "prompt", "response_text", "error",
+        "citations_count", "citations", "sources_count", "sources_cited",
+        "prompt", "response_text", "error",
     ]
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -341,6 +396,14 @@ def main():
         comp_counts = {}
         for c in all_competitors:
             comp_counts[c] = comp_counts.get(c, 0) + 1
+        # Sources aggregees
+        all_sources = []
+        for r in results_p:
+            if r.get("sources_cited"):
+                all_sources.extend([s.strip() for s in r["sources_cited"].split("|") if s.strip()])
+        source_counts = {}
+        for s in all_sources:
+            source_counts[s] = source_counts.get(s, 0) + 1
         by_provider[p] = {
             "total": len(results_p),
             "mentioned": len(mentioned),
@@ -348,6 +411,7 @@ def main():
             "mention_rate": round(len(mentioned) / max(len(results_p), 1) * 100, 1),
             "model": MODELS[p]["name"],
             "competitor_counts": sorted(comp_counts.items(), key=lambda x: -x[1]),
+            "source_counts": sorted(source_counts.items(), key=lambda x: -x[1])[:20],
         }
 
     html_path = out_dir / "probe-report.html"
