@@ -212,7 +212,7 @@ def main():
     parser.add_argument("--brand", required=True, help="Votre marque (pour detection mention)")
     parser.add_argument("--competitors", default="", help="Concurrents separes par virgule")
     parser.add_argument("--variables", default="{}", help="JSON inline override des variables")
-    parser.add_argument("--models", default="openai,anthropic,perplexity,gemini,mistral", help="Liste providers")
+    parser.add_argument("--models", default="openai,anthropic,perplexity,gemini", help="Liste providers (defaut: openai,anthropic,perplexity,gemini ; mistral disponible mais opt-in)")
     parser.add_argument("--out", default="./probe-report", help="Dossier de sortie")
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")
@@ -255,11 +255,18 @@ def main():
         return
 
     api_keys = {}
+    skipped = []
     for p in providers:
         key = os.environ.get(MODELS[p]["env"])
         if not key:
-            sys.exit(f"Cle API manquante pour {p} : variable d'env {MODELS[p]['env']}")
+            skipped.append(f"{p} (variable {MODELS[p]['env']} absente)")
+            continue
         api_keys[p] = key
+    if skipped:
+        print(f"Providers skippes : {', '.join(skipped)}", file=sys.stderr)
+    providers = [p for p in providers if p in api_keys]
+    if not providers:
+        sys.exit("Aucune cle API disponible. Renseignez au moins une variable d'env (cf. .env.example).")
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)

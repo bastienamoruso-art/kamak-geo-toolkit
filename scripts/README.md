@@ -134,17 +134,39 @@ open probe-report/probe-report.html
 
 ### Providers et modèles utilisés
 
-| Provider | Modèle par défaut | Retrieval web ? |
-|---|---|---|
-| OpenAI | `gpt-4o-mini` | Non |
-| Anthropic | `claude-sonnet-4-5` | Non |
-| Perplexity | `sonar` | **Oui** (search temps réel) |
-| Gemini | `gemini-2.5-flash` | Non |
-| Mistral | `mistral-large-latest` | Non |
+| Provider | Modèle par défaut | Retrieval web ? | Inclus par défaut |
+|---|---|---|---|
+| OpenAI | `gpt-4o-mini` | Non | ✅ |
+| Anthropic | `claude-sonnet-4-5` | Non | ✅ |
+| Perplexity | `sonar` | **Oui** (search temps réel) | ✅ |
+| Gemini | `gemini-2.5-flash` | Non | ✅ |
+| Mistral | `mistral-large-latest` | Non | ❌ (opt-in via `--models openai,...,mistral`) |
+
+Le script **skippe automatiquement** les providers dont vous n'avez pas la clé API (warning au démarrage). Vous n'avez qu'OpenAI ? Le script tourne quand même, juste avec OpenAI.
 
 Pour changer un modèle, éditez le dict `MODELS` en haut de `probe-api.py`. Pas de complication d'argparse — c'est volontaire pour rester lisible.
 
-Si vous n'avez que certaines clés, limitez avec `--models openai,anthropic` par exemple. Les providers non listés sont skippés. Sans clé pour un provider listé, le script s'arrête avec un message clair.
+### Quel livrable selon l'interface
+
+Tous les providers donnent **mention marque + concurrents + position**. Mais ce que vous obtenez en plus dépend du provider :
+
+| Provider | Mention marque | Concurrents cités | Sources URL | Représente quelle interface ? |
+|---|---|---|---|---|
+| **OpenAI** `gpt-4o-mini` | ✅ | ✅ | ❌ | ChatGPT standard (modèle sans web) |
+| **Anthropic** `claude-sonnet-4-5` | ✅ | ✅ | ❌ | Claude.ai standard (modèle sans web) |
+| **Perplexity** `sonar` | ✅ | ✅ | ✅ **URLs réelles** | Perplexity.ai (search retrieval intégré) |
+| **Gemini** `gemini-2.5-flash` | ✅ | ✅ | ❌ | Gemini standard (modèle sans web) |
+
+**Conséquences pratiques** :
+
+- **Sur OpenAI / Anthropic / Gemini** : vous mesurez la présence de votre marque dans le **corpus d'entraînement** du modèle. Si vous n'y êtes pas, vous êtes invisible sur l'interface standard de ces assistants (sauf si l'utilisateur active explicitement un mode web search côté UI, ce que l'API ne reproduit pas).
+- **Sur Perplexity** : vous mesurez ce qu'**un utilisateur reçoit réellement** en posant la question — y compris les URLs des sources citées. C'est le plus proche de l'expérience prospect. Si vous avez du bon SEO mais pas de pression de marque, vous serez plus visible sur Perplexity que sur les 3 autres.
+- **L'interface réelle ChatGPT/Claude/Gemini** active souvent du web search côté UI (selon abonnement, modèle, fonctionnalités). Pour mesurer ça, le script ne suffit pas — c'est ce que mesure le **test manuel** dans `prompts/`.
+
+Le croisement des 4 providers vous donne :
+- **Présence dans le corpus** (OpenAI + Anthropic + Gemini)
+- **Présence en search web** (Perplexity)
+- **Concurrents perçus par chaque modèle** (utile pour identifier qui mène la perception et qui est sous-représenté)
 
 ### Détection mention et concurrents
 
@@ -157,18 +179,19 @@ Pour les sources citées, Perplexity expose un champ `citations` structuré. Pou
 
 ### Coût estimé
 
-Par run complet de 15 prompts sur les 5 providers (75 appels) :
+Par run complet de 15 prompts sur les 4 providers par défaut (60 appels) :
 
 | Provider | Coût indicatif |
 |---|---|
 | OpenAI gpt-4o-mini | ~0.02 € |
 | Anthropic Sonnet | ~0.20 € |
-| Perplexity sonar | ~0.30 € |
-| Gemini 2.5 Flash | ~0.02 € (quota gratuit possible) |
-| Mistral Large | ~0.15 € |
-| **Total** | **~0.70 € par persona** |
+| Perplexity sonar | ~0.30 € (min 50 $ de crédit pour activer le compte) |
+| Gemini 2.5 Flash | ~0.02 € (quota gratuit généreux sur AI Studio) |
+| **Total** | **~0.55 € par persona** |
 
-Soit ~5 € pour les 8 personas sur les 5 providers. À comparer aux 50-200 €/mois d'un outil GEO commercial.
+Soit ~4-5 € pour les 8 personas sur les 4 providers. À comparer aux 50-200 €/mois d'un outil GEO commercial.
+
+**Note Perplexity** : leur API exige un crédit initial de 50 $ minimum pour activer le compte. Si vous n'avez pas ce budget, lancez avec `--models openai,anthropic,gemini` et complétez à la main sur l'interface Perplexity.ai (c'est ce qu'on appelle l'**Outil 1 — test manuel**, voir [`../prompts/`](../prompts/)).
 
 ### Aide à l'interprétation
 
