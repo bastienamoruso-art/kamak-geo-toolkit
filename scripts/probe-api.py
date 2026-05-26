@@ -295,6 +295,81 @@ def substitute(prompt, variables):
     return prompt
 
 
+def load_gsc_queries_from_csv(csv_path, min_words=4, top_n=20):
+    """Charge les top requetes long-tail depuis un export CSV de Google Search Console.
+
+    Accepte les exports standards GSC : colonnes "Top queries"/"Query"/"Requete"
+    et "Impressions". Filtre par nombre de mots et tri par impressions desc.
+    """
+    queries = []
+    with open(csv_path, encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            q = (
+                row.get("Top queries")
+                or row.get("Query")
+                or row.get("Requête")
+                or row.get("Requete")
+                or row.get("query")
+            )
+            imp_raw = row.get("Impressions") or row.get("impressions") or "0"
+            try:
+                impressions = int(str(imp_raw).replace(",", "").replace(" ", "").replace("\xa0", ""))
+            except ValueError:
+                impressions = 0
+            if not q or impressions <= 0:
+                continue
+            if len(q.split()) < min_words:
+                continue
+            queries.append((q, impressions))
+    queries.sort(key=lambda x: -x[1])
+    return [q[0] for q in queries[:top_n]]
+
+
+def load_gsc_queries_from_api(site_url, credentials_path, min_words=4, top_n=20, days=90):
+    """Recupere les top requetes long-tail via l'API Google Search Console.
+    Necessite : pip install google-auth google-api-python-client
+    + un service account JSON ayant ete ajoute comme utilisateur de la propriete GSC.
+    """
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+    except ImportError:
+        sys.exit(
+            "Pour --gsc-site : pip install google-auth google-api-python-client\n"
+            "Ou utilisez --gsc-csv avec un export CSV manuel (zero dep)."
+        )
+
+    from datetime import timedelta
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path,
+        scopes=["https://www.googleapis.com/auth/webmasters.readonly"],
+    )
+    service = build("searchconsole", "v1", credentials=credentials, cache_discovery=False)
+
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days)
+    request_body = {
+        "startDate": start_date.strftime("%Y-%m-%d"),
+        "endDate": end_date.strftime("%Y-%m-%d"),
+        "dimensions": ["query"],
+        "rowLimit": 5000,
+    }
+    response = service.searchanalytics().query(siteUrl=site_url, body=request_body).execute()
+
+    queries = []
+    for row in response.get("rows", []):
+        q = row["keys"][0]
+        impressions = row.get("impressions", 0)
+        if impressions <= 0:
+            continue
+        if len(q.split()) < min_words:
+            continue
+        queries.append((q, impressions))
+    queries.sort(key=lambda x: -x[1])
+    return [q[0] for q in queries[:top_n]]
+
+
 SOURCE_NOISE = {"google.com", "youtube.com", "vertexaisearch.cloud.google.com", "wikipedia.org", "fr.wikipedia.org", "calendar.google.com"}
 SOURCE_INSTITUTIONNELLES = {"orias.fr", "amf-france.org", "anil.org", "service-public.fr", "economie.gouv.fr", "banque-france.fr", "cncgp.fr", "anacofi.asso.fr"}
 
@@ -518,10 +593,24 @@ def wizard(personas_data, prompts_path):
     ws_choice = input(f"{BOLD}[6/7] Web search natif ?{RESET} {DIM}(sources réelles, ~+30% coût) [O/n] : {RESET}").strip().lower()
     web_search = ws_choice not in ("n", "no", "non")
 
-    # 7. Limit
+    # 7. GSC
+    print()
+    print(f"{BOLD}[7/8] Croiser avec Google Search Console ?{RESET} {DIM}(ajoute les requêtes long-tail du site){RESET}")
+    print(f"  {DIM}n : skip · csv : chemin vers export CSV GSC · site : URL GSC (necessite credentials){RESET}")
+    gsc_choice = input(f"{DIM}Choix [n/csv/site] (defaut n) : {RESET}").strip().lower()
+    gsc_csv = None
+    gsc_site = None
+    gsc_credentials = None
+    if gsc_choice == "csv":
+        gsc_csv = input(f"{DIM}Chemin CSV : {RESET}").strip()
+    elif gsc_choice == "site":
+        gsc_site = input(f"{DIM}URL site GSC (ex: https://aeconomia.fr) : {RESET}").strip()
+        gsc_credentials = input(f"{DIM}Chemin service account JSON : {RESET}").strip()
+
+    # 8. Limit
     print()
     nb_prompts = len(persona["prompts"])
-    limit_raw = input(f"{BOLD}[7/7] Limit prompts{RESET} {DIM}(Enter = tous = {nb_prompts}) : {RESET}").strip()
+    limit_raw = input(f"{BOLD}[8/8] Limit prompts du persona{RESET} {DIM}(Enter = tous = {nb_prompts}, GSC s'ajoute apres) : {RESET}").strip()
     limit = None
     if limit_raw.isdigit():
         limit = max(1, min(int(limit_raw), nb_prompts))
@@ -555,6 +644,9 @@ def wizard(personas_data, prompts_path):
         "providers": providers,
         "web_search": web_search,
         "limit": limit,
+        "gsc_csv": gsc_csv,
+        "gsc_site": gsc_site,
+        "gsc_credentials": gsc_credentials,
     }
 
 
@@ -582,6 +674,11 @@ def main():
     parser.add_argument("--csv-only", action="store_true", help="Ne produire que le CSV")
     parser.add_argument("--web-search", action="store_true", help="Active le web search NATIF sur chaque provider (OpenAI gpt-4o-mini-search-preview, Anthropic tool web_search, Gemini google_search, Perplexity natif). Sources reelles + verifiables. Cout legerement plus eleve.")
     parser.add_argument("--limit", type=int, default=None, help="Limite le nombre de prompts (defaut: tous). Utile pour test rapide ou budget restreint.")
+    parser.add_argument("--gsc-csv", default=None, help="Chemin vers un export CSV GSC (Performance > Export). Les top requetes long-tail sont ajoutees aux prompts en categorie 'gsc-real'.")
+    parser.add_argument("--gsc-site", default=None, help="URL du site GSC (ex: https://aeconomia.fr ou sc-domain:aeconomia.fr). Necessite --gsc-credentials et 'pip install google-auth google-api-python-client'.")
+    parser.add_argument("--gsc-credentials", default=None, help="Chemin vers le service account JSON (pour --gsc-site).")
+    parser.add_argument("--gsc-min-words", type=int, default=4, help="Min mots par requete GSC (defaut: 4)")
+    parser.add_argument("--gsc-top", type=int, default=20, help="Top N requetes GSC a inclure (defaut: 20)")
     parser.add_argument("--dry-run", action="store_true", help="Affiche les prompts substitues sans appeler les APIs")
 
     args = parser.parse_args()
@@ -606,6 +703,9 @@ def main():
         args.models = ",".join(wiz["providers"])
         args.web_search = wiz["web_search"]
         args.limit = wiz["limit"]
+        args.gsc_csv = wiz.get("gsc_csv")
+        args.gsc_site = wiz.get("gsc_site")
+        args.gsc_credentials = wiz.get("gsc_credentials")
 
     # Validation post-wizard
     if not args.persona:
@@ -618,6 +718,35 @@ def main():
     if args.limit:
         persona = dict(persona)
         persona["prompts"] = persona["prompts"][:args.limit]
+
+    # Ajout des requetes GSC reelles si --gsc-csv ou --gsc-site fourni
+    gsc_queries = []
+    if args.gsc_csv:
+        if not Path(args.gsc_csv).exists():
+            sys.exit(f"Erreur : fichier GSC CSV introuvable : {args.gsc_csv}")
+        gsc_queries = load_gsc_queries_from_csv(args.gsc_csv, args.gsc_min_words, args.gsc_top)
+        print(f"GSC CSV : {len(gsc_queries)} requetes long-tail chargees depuis {args.gsc_csv}", file=sys.stderr)
+    elif args.gsc_site:
+        if not args.gsc_credentials:
+            sys.exit("Erreur : --gsc-site necessite --gsc-credentials (service account JSON).")
+        if not Path(args.gsc_credentials).exists():
+            sys.exit(f"Erreur : credentials introuvables : {args.gsc_credentials}")
+        gsc_queries = load_gsc_queries_from_api(
+            args.gsc_site, args.gsc_credentials, args.gsc_min_words, args.gsc_top
+        )
+        print(f"GSC API : {len(gsc_queries)} requetes long-tail chargees pour {args.gsc_site}", file=sys.stderr)
+
+    if gsc_queries:
+        persona = dict(persona)
+        existing_prompts = list(persona["prompts"])
+        next_id = max((p["id"] for p in existing_prompts), default=0) + 1
+        for i, q in enumerate(gsc_queries):
+            existing_prompts.append({
+                "id": next_id + i,
+                "category": "gsc-real",
+                "text": q,
+            })
+        persona["prompts"] = existing_prompts
 
     try:
         variables = json.loads(args.variables)

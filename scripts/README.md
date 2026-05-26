@@ -151,7 +151,36 @@ open probe-report/probe-report.html
 | `--out` | `./probe-report` | Dossier de sortie |
 | `--csv-only` | `false` | Saute la génération HTML |
 | `--ask-sources` | `false` | **Ajoute un 2e appel par prompt** demandant les sources/sites que le modèle utilise (double le coût, mais ramène la liste actionnable des sites à viser pour entrer dans le corpus) |
+| `--gsc-csv` | — | Chemin vers un export CSV GSC. Les top requêtes long-tail sont ajoutées en catégorie `gsc-real` |
+| `--gsc-site` | — | URL du site GSC (nécessite `--gsc-credentials` + libs Google) |
+| `--gsc-credentials` | — | Chemin vers service account JSON (pour `--gsc-site`) |
+| `--gsc-min-words` | `4` | Min mots par requête GSC |
+| `--gsc-top` | `20` | Top N requêtes GSC à inclure |
 | `--dry-run` | `false` | Affiche les prompts substitués sans appeler les APIs |
+
+### Intégration GSC (--gsc-csv ou --gsc-site)
+
+Le tool peut enrichir le persona avec les **vraies requêtes long-tail** issues de votre Google Search Console. Deux modes :
+
+**Mode CSV** (zero dépendance, recommandé pour débuter) :
+
+1. Dans GSC : Performance → Onglet *Queries* → Bouton *Export* → CSV
+2. Lancer : `python probe-api.py ... --gsc-csv /path/to/export.csv --gsc-top 20`
+
+**Mode API live** (nécessite setup Google Cloud) :
+
+```bash
+pip install google-auth google-api-python-client
+python probe-api.py ... --gsc-site "https://example.com" --gsc-credentials sa.json
+```
+
+Le service account doit être ajouté en utilisateur de la propriété GSC (Settings > Users and permissions > Add user).
+
+**Comment c'est intégré** : les top N requêtes 4+ mots avec impressions > 0 sont ajoutées au persona en catégorie `gsc-real`. Vous obtenez deux mesures dans le même rapport :
+- Catégorie `decouverte` / `comparaison` / etc. : prompts synthétiques du persona
+- Catégorie `gsc-real` : vraies requêtes prospects de votre site
+
+Filtre par catégorie dans le rapport HTML pour comparer les deux.
 
 ### À quoi sert `--ask-sources` (recommandé pour avoir un plan d'action)
 
