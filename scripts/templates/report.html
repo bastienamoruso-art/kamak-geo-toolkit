@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapport bots IA — {{ period_start }} au {{ period_end }}</title>
+<style>
+  :root {
+    --primary: #f7c724;
+    --accent: #c526f6;
+    --fg-1: #000;
+    --fg-2: rgba(0,0,0,.7);
+    --fg-3: rgba(0,0,0,.5);
+    --bg: #f5f5f5;
+    --white: #fff;
+    --border: rgba(0,0,0,.08);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Roboto", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--fg-1);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1120px; margin: 0 auto; padding: 40px 24px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  .brand { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-3); }
+  h1 { font-family: var(--mono); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin-top: 8px; }
+  .period { color: var(--fg-2); font-size: 16px; margin-top: 8px; }
+  .meta { color: var(--fg-3); font-size: 13px; margin-top: 12px; font-family: var(--mono); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 40px; }
+  .kpi { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .kpi__label { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+  .kpi__value { font-family: var(--mono); font-size: 32px; font-weight: 700; line-height: 1.1; margin-top: 8px; }
+  .kpi__sub { font-size: 13px; color: var(--fg-2); margin-top: 4px; }
+  .kpi--highlight { background: var(--primary); }
+  .kpi--highlight .kpi__label, .kpi--highlight .kpi__sub { color: rgba(0,0,0,.7); }
+
+  section { margin-bottom: 48px; }
+  h2 { font-family: var(--mono); font-size: 24px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-family: var(--mono); font-size: 18px; margin-bottom: 12px; }
+
+  .chart-wrap { background: var(--white); border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  canvas { max-width: 100%; }
+
+  .category { margin-bottom: 32px; }
+  .category__head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .category__dot { width: 14px; height: 14px; border-radius: 50%; }
+  .category__title { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .category__count { font-family: var(--mono); font-size: 13px; color: var(--fg-3); margin-left: auto; }
+
+  .bots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .bot-card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .bot-card__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .bot-card__name { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+  .bot-card__total { font-family: var(--mono); font-weight: 700; font-size: 20px; }
+  .bot-card__purpose { color: var(--fg-2); font-size: 13px; margin-bottom: 12px; }
+  .bot-card__meta { font-family: var(--mono); font-size: 11px; color: var(--fg-3); margin-bottom: 16px; letter-spacing: .04em; text-transform: uppercase; }
+  .bot-card__meta--no-robots { color: #c00; }
+  .bot-card__section { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-top: 16px; margin-bottom: 6px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+  td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .path { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+
+  .status-pill { display: inline-block; padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 700; margin-right: 4px; }
+  .status-2xx { background: rgba(14, 221, 137, .15); color: #008454; }
+  .status-3xx { background: rgba(39, 190, 247, .15); color: #006499; }
+  .status-4xx { background: rgba(247, 199, 36, .25); color: #6e4f00; }
+  .status-5xx { background: rgba(197, 38, 246, .15); color: #6a0d8a; }
+
+  .empty { padding: 16px; text-align: center; color: var(--fg-3); background: var(--white); border-radius: 12px; }
+
+  footer { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 48px; color: var(--fg-3); font-size: 13px; }
+  footer a { color: var(--fg-1); text-decoration: underline; text-underline-offset: 2px; }
+  footer a:hover { color: var(--accent); }
+  .footer-cta { background: var(--primary); padding: 16px 20px; border-radius: 12px; margin-bottom: 16px; color: var(--fg-1); font-family: var(--mono); font-size: 14px; }
+  .footer-cta a { color: var(--fg-1); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">GEO Toolkit / Rapport bots IA</div>
+    <h1>Crawl bots IA et SEO classique</h1>
+    <p class="period">Période analysée : {{ period_start }} au {{ period_end }}</p>
+    <p class="meta">Généré le {{ generated_at }} · {{ total_lines }} lignes parsées · {{ bot_hits_total }} hits bots</p>
+  </header>
+
+  <section>
+    <h2>Vue d'ensemble</h2>
+    <div class="kpis">
+      <div class="kpi kpi--highlight">
+        <div class="kpi__label">Hits bots IA</div>
+        <div class="kpi__value">{{ ia_total }}</div>
+        <div class="kpi__sub">Sur la période</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi__label">Hits SEO classique</div>
+        <div class="kpi__value">{{ seo_total }}</div>
+        <div class="kpi__sub">Googlebot + Bingbot</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi__label">Ratio IA / SEO</div>
+        <div class="kpi__value">
+          {% if seo_total > 0 %}{{ "%.2f"|format(ia_total / seo_total) }}{% else %}—{% endif %}
+        </div>
+        <div class="kpi__sub">{% if seo_total > 0 and ia_total > seo_total %}IA &gt; SEO{% elif seo_total > 0 %}SEO &gt; IA{% else %}Aucun crawl SEO classique détecté{% endif %}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi__label">Bots détectés</div>
+        <div class="kpi__value">{{ bot_stats|length }}</div>
+        <div class="kpi__sub">User-agents distincts</div>
+      </div>
+    </div>
+  </section>
+
+  {% if bot_stats|length > 0 %}
+  <section>
+    <h2>Volume quotidien par bot</h2>
+    <div class="chart-wrap">
+      <canvas id="dailyChart" height="100"></canvas>
+    </div>
+  </section>
+
+  {# Regrouper par catégorie #}
+  {% set categories = {} %}
+  {% for bot in bot_stats %}
+    {% if bot.category not in categories %}
+      {% set _ = categories.update({bot.category: {'label': bot.category_label, 'color': bot.color, 'bots': [], 'total': 0}}) %}
+    {% endif %}
+    {% set _ = categories[bot.category]['bots'].append(bot) %}
+    {% set _ = categories[bot.category].update({'total': categories[bot.category]['total'] + bot.total}) %}
+  {% endfor %}
+
+  <section>
+    <h2>Détail par bot</h2>
+    {% for cat_id, cat in categories.items() %}
+    <div class="category">
+      <div class="category__head">
+        <span class="category__dot" style="background: {{ cat.color }};"></span>
+        <span class="category__title">{{ cat.label }}</span>
+        <span class="category__count">{{ cat.total }} hits / {{ cat.bots|length }} bot(s)</span>
+      </div>
+      <div class="bots-grid">
+        {% for bot in cat.bots %}
+        <div class="bot-card">
+          <div class="bot-card__head">
+            <div class="bot-card__name">{{ bot.name }}</div>
+            <div class="bot-card__total">{{ bot.total }}</div>
+          </div>
+          <div class="bot-card__purpose">{{ bot.purpose }}</div>
+          <div class="bot-card__meta {% if not bot.respects_robots %}bot-card__meta--no-robots{% endif %}">
+            {% if bot.respects_robots %}Respecte robots.txt{% else %}Ne respecte pas robots.txt{% endif %}
+          </div>
+
+          <div class="bot-card__section">Statuts HTTP</div>
+          <div>
+            {% for status, count in bot.status.items() %}
+              <span class="status-pill status-{{ status[0] }}xx">{{ status }} · {{ count }}</span>
+            {% endfor %}
+          </div>
+
+          <div class="bot-card__section">Top {{ bot.top_pages|length }} pages crawlées</div>
+          {% if bot.top_pages %}
+          <table>
+            <thead>
+              <tr>
+                <th>Page</th>
+                <th class="num">Hits</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for path, count in bot.top_pages %}
+              <tr>
+                <td class="path">{{ path }}</td>
+                <td class="num">{{ count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">Aucune page</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  {% else %}
+  <div class="empty">Aucun bot IA ou SEO détecté dans les logs analysés.</div>
+  {% endif %}
+
+  <footer>
+    <div class="footer-cta">
+      Pour la méthode complète (template prompts + parser) et les évolutions :
+      <a href="https://kamak.ai/geo-toolkit">kamak.ai/geo-toolkit</a>
+    </div>
+    <p>
+      Généré par <a href="https://github.com/bastienamoruso-art/kamak-geo-toolkit">kamak-geo-toolkit</a> · MIT ·
+      Bastien Amoruso / <a href="https://kamak.ai">KAMAK</a>
+    </p>
+  </footer>
+</div>
+
+{% if bot_stats|length > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const labels = {{ all_days|tojson }};
+  const datasets = [
+    {% for bot in bot_stats %}
+    {
+      label: {{ bot.name|tojson }},
+      data: {{ daily_by_bot[bot.id]|tojson }},
+      backgroundColor: {{ bot.color|tojson }},
+      borderColor: {{ bot.color|tojson }},
+      borderWidth: 0,
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+  const ctx = document.getElementById('dailyChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'system-ui, -apple-system, sans-serif', size: 12 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { stacked: true, ticks: { font: { family: 'ui-monospace, monospace', size: 11 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { font: { family: 'ui-monospace, monospace', size: 11 } } }
+      }
+    }
+  });
+</script>
+{% endif %}
+
+</body>
+</html>

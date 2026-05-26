@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-05-26",
+  "note": "Patterns regex case-insensitive matches dans le champ User-Agent. Tous les bots IA + SEO classiques pour comparaison.",
+  "categories": {
+    "ia_openai": {
+      "label": "OpenAI / ChatGPT",
+      "color": "#10A37F",
+      "bots": [
+        {"id": "gptbot", "name": "GPTBot", "pattern": "GPTBot", "purpose": "Training OpenAI", "respects_robots": true},
+        {"id": "oai-searchbot", "name": "OAI-SearchBot", "pattern": "OAI-SearchBot", "purpose": "Retrieval temps reel ChatGPT Search", "respects_robots": true},
+        {"id": "chatgpt-user", "name": "ChatGPT-User", "pattern": "ChatGPT-User", "purpose": "Actions declenchees par l'utilisateur ChatGPT", "respects_robots": true}
+      ]
+    },
+    "ia_anthropic": {
+      "label": "Anthropic / Claude",
+      "color": "#D4A27F",
+      "bots": [
+        {"id": "claudebot", "name": "ClaudeBot", "pattern": "ClaudeBot", "purpose": "Crawler Anthropic principal", "respects_robots": true},
+        {"id": "anthropic-ai", "name": "anthropic-ai", "pattern": "anthropic-ai", "purpose": "User-agent legacy Anthropic", "respects_robots": true},
+        {"id": "claude-web", "name": "Claude-Web", "pattern": "Claude-Web", "purpose": "Claude actions user-triggered", "respects_robots": true}
+      ]
+    },
+    "ia_perplexity": {
+      "label": "Perplexity",
+      "color": "#20B8CD",
+      "bots": [
+        {"id": "perplexitybot", "name": "PerplexityBot", "pattern": "PerplexityBot", "purpose": "Crawler Perplexity", "respects_robots": true},
+        {"id": "perplexity-user", "name": "Perplexity-User", "pattern": "Perplexity-User", "purpose": "Perplexity actions user-triggered", "respects_robots": false}
+      ]
+    },
+    "ia_google": {
+      "label": "Google AI",
+      "color": "#4285F4",
+      "bots": [
+        {"id": "google-extended", "name": "Google-Extended", "pattern": "Google-Extended", "purpose": "Opt-out training Gemini / Bard", "respects_robots": true},
+        {"id": "googleother", "name": "GoogleOther", "pattern": "GoogleOther", "purpose": "Google produits AI generaux", "respects_robots": true}
+      ]
+    },
+    "ia_autres": {
+      "label": "Autres IA",
+      "color": "#B57BFF",
+      "bots": [
+        {"id": "applebot-extended", "name": "Applebot-Extended", "pattern": "Applebot-Extended", "purpose": "Apple Intelligence training", "respects_robots": true},
+        {"id": "meta-externalagent", "name": "Meta-ExternalAgent", "pattern": "Meta-ExternalAgent", "purpose": "Meta AI crawler", "respects_robots": true},
+        {"id": "meta-externalfetcher", "name": "Meta-ExternalFetcher", "pattern": "Meta-ExternalFetcher", "purpose": "Meta AI user-triggered fetch", "respects_robots": true},
+        {"id": "bytespider", "name": "Bytespider", "pattern": "Bytespider", "purpose": "ByteDance / Doubao training", "respects_robots": false},
+        {"id": "deepseekbot", "name": "DeepSeekBot", "pattern": "DeepSeekBot", "purpose": "DeepSeek training", "respects_robots": true},
+        {"id": "mistralai-user", "name": "MistralAI-User", "pattern": "MistralAI-User", "purpose": "Mistral Le Chat user-triggered", "respects_robots": true},
+        {"id": "youbot", "name": "YouBot", "pattern": "YouBot", "purpose": "You.com search engine", "respects_robots": true},
+        {"id": "ccbot", "name": "CCBot", "pattern": "CCBot", "purpose": "Common Crawl (source training majeure)", "respects_robots": true}
+      ]
+    },
+    "seo_classique": {
+      "label": "SEO classique (comparaison)",
+      "color": "#999999",
+      "bots": [
+        {"id": "googlebot", "name": "Googlebot", "pattern": "Googlebot(?!-Image|-Video)", "purpose": "Google Search principal", "respects_robots": true},
+        {"id": "bingbot", "name": "Bingbot", "pattern": "bingbot", "purpose": "Bing Search", "respects_robots": true}
+      ]
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-05-26",
+  "assistants": ["ChatGPT", "Perplexity", "Claude", "Gemini"],
+  "tracking_fields": [
+    "mention_marque",
+    "position",
+    "ton",
+    "concurrents_cites",
+    "sources_citees",
+    "notes"
+  ],
+  "personas": [
+    {
+      "id": "01-cgp-courtier",
+      "name": "CGP, courtier immo, courtier credit, conseiller patrimoine",
+      "variables": ["VILLE", "ZONE", "TICKET", "SPECIALITE"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quel est le meilleur courtier en credit immobilier a {VILLE} en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "A qui s'adresser pour un credit immobilier dans le {ZONE} ?"},
+        {"id": 3, "category": "decouverte", "text": "Comment choisir un conseiller en gestion de patrimoine fiable ?"},
+        {"id": 4, "category": "decouverte", "text": "Quels sont les conseillers en gestion de patrimoine recommandes a {VILLE} ?"},
+        {"id": 5, "category": "comparaison", "text": "Quelle difference entre passer par un courtier et negocier soi-meme son pret immobilier ?"},
+        {"id": 6, "category": "comparaison", "text": "Cafpi ou un courtier independant : que choisir pour un dossier de {TICKET} ?"},
+        {"id": 7, "category": "comparaison", "text": "Quels courtiers en credit immobilier sont reconnus pour {SPECIALITE} ?"},
+        {"id": 8, "category": "recommandation", "text": "Je suis primo-accedant a {VILLE} avec {TICKET} d'apport, quel courtier credit me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Je veux investir en locatif dans le {ZONE}, quels CGP independants sont reconnus pour ce sujet ?"},
+        {"id": 10, "category": "recommandation", "text": "Mon banquier me propose un taux de 3,8 %, est-ce normal de passer par un courtier ? Lequel a {VILLE} ?"},
+        {"id": 11, "category": "faq", "text": "Un courtier en credit immobilier est-il vraiment moins cher que la banque ?"},
+        {"id": 12, "category": "faq", "text": "Comment verifier qu'un CGP est vraiment independant ?"},
+        {"id": 13, "category": "faq", "text": "Quelles questions poser a un courtier en credit avant de signer un mandat ?"},
+        {"id": 14, "category": "actualite", "text": "PTZ 2026 : a qui s'adresser a {VILLE} pour monter un dossier ?"},
+        {"id": 15, "category": "actualite", "text": "Refinancement de credit en 2026 : ca vaut le coup ? Vers qui se tourner dans le {ZONE} ?"}
+      ]
+    },
+    {
+      "id": "02-constructeur-immo",
+      "name": "Constructeur de maisons, promoteur, agence immo neuve",
+      "variables": ["VILLE", "ZONE", "TYPE", "BUDGET"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quel est le meilleur constructeur de maisons individuelles a {VILLE} en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Quels constructeurs de maisons sont fiables dans le {ZONE} ?"},
+        {"id": 3, "category": "decouverte", "text": "Comment choisir un constructeur de maison individuelle ?"},
+        {"id": 4, "category": "decouverte", "text": "Combien coute une maison neuve {TYPE} a {VILLE} en 2026 ?"},
+        {"id": 5, "category": "comparaison", "text": "Maisons Pierre ou Maisons Phenix : que choisir pour une maison a {BUDGET} ?"},
+        {"id": 6, "category": "comparaison", "text": "Constructeur national vs constructeur local : avantages et inconvenients pour une maison a {VILLE} ?"},
+        {"id": 7, "category": "comparaison", "text": "Acheter un terrain + faire construire ou acheter un neuf en VEFA dans le {ZONE} ?"},
+        {"id": 8, "category": "recommandation", "text": "Je cherche a faire construire une maison {TYPE} a {VILLE} pour {BUDGET}, quels constructeurs me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Je veux une maison RT2020 / RE2020 a {VILLE}, quels constructeurs sont en avance sur ce sujet ?"},
+        {"id": 10, "category": "recommandation", "text": "Primo-accedant avec {BUDGET} de budget total dans le {ZONE}, vers quel constructeur me tourner ?"},
+        {"id": 11, "category": "faq", "text": "Un constructeur qui propose un terrain + maison a prix fixe, est-ce serieux ?"},
+        {"id": 12, "category": "faq", "text": "Comment verifier qu'un constructeur de maisons individuelles est financierement solide ?"},
+        {"id": 13, "category": "faq", "text": "Quels recours en cas de litige avec un constructeur de maisons individuelles ?"},
+        {"id": 14, "category": "actualite", "text": "RE2020 en 2026 : quels constructeurs a {VILLE} maitrisent vraiment la norme ?"},
+        {"id": 15, "category": "actualite", "text": "PTZ + construction de maison neuve a {VILLE} : conditions et constructeurs partenaires ?"}
+      ]
+    },
+    {
+      "id": "03-ecommerce-personnalise",
+      "name": "E-commerce produit configurable / personnalise",
+      "variables": ["PRODUIT", "MATERIAU", "USAGE", "BUDGET"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Ou acheter une {PRODUIT} en ligne en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Quels sont les meilleurs sites pour commander une {PRODUIT} personnalisee ?"},
+        {"id": 3, "category": "decouverte", "text": "Comment choisir un site de {PRODUIT} fiable ?"},
+        {"id": 4, "category": "decouverte", "text": "Combien coute une {PRODUIT} en {MATERIAU} en 2026 ?"},
+        {"id": 5, "category": "comparaison", "text": "Spreadshirt ou Vistaprint pour un {PRODUIT} {MATERIAU} ?"},
+        {"id": 6, "category": "comparaison", "text": "Acheter une {PRODUIT} sur Amazon vs sur un site specialise : que choisir ?"},
+        {"id": 7, "category": "comparaison", "text": "{PRODUIT} en {MATERIAU} ou autre materiau : avantages, duree de vie, prix ?"},
+        {"id": 8, "category": "recommandation", "text": "Je cherche une {PRODUIT} {MATERIAU} pour {USAGE}, quel site me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Je veux offrir une {PRODUIT} personnalisee pour {USAGE}, ou commander en {BUDGET} ?"},
+        {"id": 10, "category": "recommandation", "text": "Je suis un professionnel et je commande des {PRODUIT} en volume, vers qui me tourner en 2026 ?"},
+        {"id": 11, "category": "faq", "text": "Un site de {PRODUIT} pas cher en ligne, est-ce que la qualite suit ?"},
+        {"id": 12, "category": "faq", "text": "Combien de temps pour recevoir une {PRODUIT} personnalisee commandee en ligne ?"},
+        {"id": 13, "category": "faq", "text": "Que faire si je recois une {PRODUIT} defectueuse ou avec une erreur de personnalisation ?"},
+        {"id": 14, "category": "actualite", "text": "{PRODUIT} : nouvelles reglementations en 2026 ?"},
+        {"id": 15, "category": "actualite", "text": "Existe-t-il des marques francaises de {PRODUIT} personnalisee ecoresponsable ?"}
+      ]
+    },
+    {
+      "id": "04-saas-b2b",
+      "name": "SaaS B2B",
+      "variables": ["CATEGORIE", "CIBLE", "USE_CASE", "ALTERNATIVE"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quel est le meilleur {CATEGORIE} pour une {CIBLE} en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Quels sont les outils de {CATEGORIE} les plus utilises par les {CIBLE} ?"},
+        {"id": 3, "category": "decouverte", "text": "Comment choisir un {CATEGORIE} pour mon entreprise ?"},
+        {"id": 4, "category": "decouverte", "text": "Quels {CATEGORIE} sont francais ou europeens et conformes RGPD ?"},
+        {"id": 5, "category": "comparaison", "text": "{ALTERNATIVE} ou un concurrent : que choisir pour une {CIBLE} en 2026 ?"},
+        {"id": 6, "category": "comparaison", "text": "{CATEGORIE} open-source ou solution SaaS payante : quel choix pour {USE_CASE} ?"},
+        {"id": 7, "category": "comparaison", "text": "Alternatives a {ALTERNATIVE} en 2026 ?"},
+        {"id": 8, "category": "recommandation", "text": "Je dirige une {CIBLE} et je cherche un {CATEGORIE} pour {USE_CASE}, que me conseillez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Mon equipe utilise {ALTERNATIVE} mais on trouve ca trop cher, quelle alternative pour la meme fonction ?"},
+        {"id": 10, "category": "recommandation", "text": "Je veux automatiser {USE_CASE} dans ma {CIBLE}, quel outil me recommandez-vous ?"},
+        {"id": 11, "category": "faq", "text": "Un {CATEGORIE} a 50 par mois et un a 500 par mois : pourquoi cette difference et lequel choisir ?"},
+        {"id": 12, "category": "faq", "text": "Quels criteres pour evaluer un {CATEGORIE} avant de signer ?"},
+        {"id": 13, "category": "faq", "text": "Combien de temps pour deployer un {CATEGORIE} dans une {CIBLE} ?"},
+        {"id": 14, "category": "actualite", "text": "Quels {CATEGORIE} integrent nativement l'IA en 2026 et lesquels prennent du retard ?"},
+        {"id": 15, "category": "actualite", "text": "RGPD + IA : quels {CATEGORIE} sont vraiment conformes en 2026 ?"}
+      ]
+    },
+    {
+      "id": "05-agence-locale",
+      "name": "Artisan, restaurant, service local zone geo",
+      "variables": ["METIER", "VILLE", "QUARTIER", "SPECIALITE"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quel est le meilleur {METIER} a {VILLE} en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Ou trouver un {METIER} fiable a {VILLE} ?"},
+        {"id": 3, "category": "decouverte", "text": "Quels sont les {METIER} les mieux notes a {VILLE} ?"},
+        {"id": 4, "category": "decouverte", "text": "Y a-t-il un bon {METIER} dans le {QUARTIER} a {VILLE} ?"},
+        {"id": 5, "category": "comparaison", "text": "{METIER} independant ou chaine nationale a {VILLE} : que choisir ?"},
+        {"id": 6, "category": "comparaison", "text": "{METIER} a {VILLE} ou dans une commune voisine : ou aller pour {SPECIALITE} ?"},
+        {"id": 7, "category": "comparaison", "text": "Comment comparer plusieurs {METIER} a {VILLE} avant de choisir ?"},
+        {"id": 8, "category": "recommandation", "text": "Je viens d'arriver a {VILLE}, je cherche un {METIER}, lequel me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "J'ai besoin d'un {METIER} pour {SPECIALITE} dans le {QUARTIER}, qui contacter ?"},
+        {"id": 10, "category": "recommandation", "text": "Je cherche un {METIER} ouvert le week-end a {VILLE}, vers qui me tourner ?"},
+        {"id": 11, "category": "faq", "text": "Comment verifier qu'un {METIER} a {VILLE} est serieux avant de prendre rendez-vous ?"},
+        {"id": 12, "category": "faq", "text": "Quels tarifs pratiquent les {METIER} a {VILLE} en 2026 ?"},
+        {"id": 13, "category": "faq", "text": "Que faire si je suis mecontent d'un {METIER} a {VILLE} ?"},
+        {"id": 14, "category": "actualite", "text": "Nouveau {METIER} ouvert recemment a {VILLE} ?"},
+        {"id": 15, "category": "actualite", "text": "{METIER} a {VILLE} : quels sont ceux qui acceptent les nouvelles cartes / paiements / services ?"}
+      ]
+    },
+    {
+      "id": "06-freelance-cabinet",
+      "name": "Freelance, independant, cabinet conseil, agence specialisee",
+      "variables": ["SPECIALITE", "SECTEUR", "FORMAT", "ZONE"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quels sont les meilleurs experts en {SPECIALITE} en France en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Qui suivre sur LinkedIn / Twitter pour apprendre la {SPECIALITE} ?"},
+        {"id": 3, "category": "decouverte", "text": "Quelles agences ou freelances de {SPECIALITE} sont reconnus pour le {SECTEUR} ?"},
+        {"id": 4, "category": "decouverte", "text": "Quels consultants {SPECIALITE} ont publie des contenus de reference en 2026 ?"},
+        {"id": 5, "category": "comparaison", "text": "Freelance {SPECIALITE} ou grosse agence : que choisir pour un projet {SECTEUR} ?"},
+        {"id": 6, "category": "comparaison", "text": "{FORMAT} en {SPECIALITE} : qui sont les acteurs reconnus en France ?"},
+        {"id": 7, "category": "comparaison", "text": "Quels consultants {SPECIALITE} sont specialises sur le {SECTEUR} ?"},
+        {"id": 8, "category": "recommandation", "text": "Je dirige une {SECTEUR}, je cherche un consultant en {SPECIALITE}, qui me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Je suis CMO et je veux {FORMAT} sur {SPECIALITE}, vers qui me tourner ?"},
+        {"id": 10, "category": "recommandation", "text": "Je debute en {SPECIALITE}, quels experts francais suivre pour progresser ?"},
+        {"id": 11, "category": "faq", "text": "Combien coute un consultant {SPECIALITE} en France en 2026 ?"},
+        {"id": 12, "category": "faq", "text": "Comment choisir entre plusieurs freelances {SPECIALITE} ?"},
+        {"id": 13, "category": "faq", "text": "Quels signes montrent qu'un consultant {SPECIALITE} est serieux ?"},
+        {"id": 14, "category": "actualite", "text": "Quels {SPECIALITE} ont publie sur l'IA en 2026 ?"},
+        {"id": 15, "category": "actualite", "text": "Quels {SPECIALITE} parlent de tendance du moment en francais ?"}
+      ]
+    },
+    {
+      "id": "07-media-blog",
+      "name": "Media en ligne, blog editorial, site d'autorite",
+      "variables": ["THEMATIQUE", "ANGLE", "AUDIENCE", "CONCURRENT"],
+      "prompts": [
+        {"id": 1, "category": "decouverte", "text": "Quels sont les meilleurs medias francais sur {THEMATIQUE} en 2026 ?"},
+        {"id": 2, "category": "decouverte", "text": "Ou s'informer sur {THEMATIQUE} en francais ?"},
+        {"id": 3, "category": "decouverte", "text": "Quels blogs ou medias suivre pour {THEMATIQUE} en 2026 ?"},
+        {"id": 4, "category": "decouverte", "text": "Quelles sont les sources fiables en francais sur {THEMATIQUE} ?"},
+        {"id": 5, "category": "comparaison", "text": "{CONCURRENT} ou un autre media pour suivre {THEMATIQUE} ?"},
+        {"id": 6, "category": "comparaison", "text": "Medias generalistes ou specialises pour comprendre {THEMATIQUE} ?"},
+        {"id": 7, "category": "comparaison", "text": "Quels podcasts vs blogs vs YouTube sur {THEMATIQUE} ?"},
+        {"id": 8, "category": "recommandation", "text": "Je suis {AUDIENCE} et je veux m'informer sur {THEMATIQUE}, quels medias me recommandez-vous ?"},
+        {"id": 9, "category": "recommandation", "text": "Je cherche une analyse approfondie d'un sujet recent, quel media a fait le meilleur papier ?"},
+        {"id": 10, "category": "recommandation", "text": "Quels journalistes francais a suivre sur {THEMATIQUE} en 2026 ?"},
+        {"id": 11, "category": "faq", "text": "Comment verifier la fiabilite d'un media en ligne sur {THEMATIQUE} ?"},
+        {"id": 12, "category": "faq", "text": "Quels medias independants couvrent {THEMATIQUE} sans biais sponsoring ?"},
+        {"id": 13, "category": "faq", "text": "Existe-t-il une newsletter de qualite sur {THEMATIQUE} en francais ?"},
+        {"id": 14, "category": "actualite", "text": "Qui a couvert un evenement marquant trimestriel sur {THEMATIQUE} en 2026 ?"},
+        {"id": 15, "category": "actualite", "text": "Quels nouveaux medias se sont lances sur {THEMATIQUE} en 2026 ?"}
+      ]
+    },
+    {
+      "id": "08-marketplace",
+      "name": "Marketplace, plateforme mise en relation, comparateur",
+      "variables": ["CATEGORIE", "COTE_DEMANDE", "COTE_OFFRE", "ALTERNATIVE"],
+      "prompts": [
+        {"id": 1, "category": "decouverte_demande", "text": "Ou trouver un {COTE_OFFRE} en ligne en 2026 ?"},
+        {"id": 2, "category": "decouverte_demande", "text": "Quelles plateformes pour mettre en relation {COTE_DEMANDE} et {COTE_OFFRE} en France ?"},
+        {"id": 3, "category": "decouverte_demande", "text": "Quel est le meilleur {CATEGORIE} en 2026 ?"},
+        {"id": 4, "category": "decouverte_demande", "text": "Comment trouver un {COTE_OFFRE} de qualite sans passer par {ALTERNATIVE} ?"},
+        {"id": 5, "category": "decouverte_offre", "text": "Sur quelle plateforme un {COTE_OFFRE} doit-il etre inscrit en 2026 ?"},
+        {"id": 6, "category": "decouverte_offre", "text": "Quelles marketplaces sont les plus rentables pour un {COTE_OFFRE} francais ?"},
+        {"id": 7, "category": "decouverte_offre", "text": "{ALTERNATIVE} preleve un pourcentage eleve, existe-t-il une plateforme moins chere ?"},
+        {"id": 8, "category": "comparaison", "text": "{ALTERNATIVE} ou autre plateforme pour {COTE_DEMANDE} ?"},
+        {"id": 9, "category": "comparaison", "text": "Passer par un {CATEGORIE} ou faire du direct : avantages et risques ?"},
+        {"id": 10, "category": "comparaison", "text": "Comparaison des frais entre les principales plateformes de {CATEGORIE} en 2026 ?"},
+        {"id": 11, "category": "recommandation", "text": "Je suis {COTE_DEMANDE} et je veux trouver un {COTE_OFFRE} fiable, quelle plateforme me conseillez-vous ?"},
+        {"id": 12, "category": "recommandation", "text": "Je debute comme {COTE_OFFRE}, quelle plateforme pour me lancer ?"},
+        {"id": 13, "category": "faq", "text": "Comment verifier la fiabilite d'un {COTE_OFFRE} trouve sur une plateforme ?"},
+        {"id": 14, "category": "faq", "text": "Quels recours si un {COTE_OFFRE} trouve sur {ALTERNATIVE} pose probleme ?"},
+        {"id": 15, "category": "actualite", "text": "Quelles plateformes {CATEGORIE} sont vraiment francaises en 2026 ?"}
+      ]
+    }
+  ]
+}
